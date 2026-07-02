@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import api from '../api/client'
 import CreatePersonModal from '../components/CreatePersonModal'
 import ReportDeathModal from '../components/ReportDeathModal'
+import EditPersonModal from '../components/EditPersonModal'
 
 function formatBirth(p) {
   if (p.date_naissance) {
@@ -36,6 +37,7 @@ export default function Selection() {
   const [addError,     setAddError]   = useState('')
   const [showCreate,   setShowCreate] = useState(false)
   const [reportTarget, setReportTarget] = useState(null)
+  const [editTarget,   setEditTarget]   = useState(null)
   const [regles,       setRegles]       = useState([])
   const debounceRef = useRef(null)
 
@@ -159,8 +161,15 @@ export default function Selection() {
                       <td>
                         <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
                           {!p.deja_decede && p.statut === 'validee' && (
-                            <button className="btn btn-ghost btn-sm" title="Signaler le décès"
-                              onClick={() => setReportTarget({ id: p.alive_person_id, nom: p.nom, prenom: p.prenom })}>☠️</button>
+                            <>
+                              <button className="btn btn-ghost btn-sm" title="Modifier"
+                                onClick={() => setEditTarget({
+                                  id: p.alive_person_id, nom: p.nom, prenom: p.prenom,
+                                  categorie: p.categorie, nationalite: p.nationalite, date_naissance: p.date_naissance,
+                                })}>✏️</button>
+                              <button className="btn btn-ghost btn-sm" title="Signaler le décès"
+                                onClick={() => setReportTarget({ id: p.alive_person_id, nom: p.nom, prenom: p.prenom })}>☠️</button>
+                            </>
                           )}
                           <button className="btn btn-ghost btn-sm" title="Retirer"
                             style={{ color: '#dc2626' }}
@@ -242,6 +251,8 @@ export default function Selection() {
                                 <span className="badge badge-deceased">⚠️ Décédée</span>
                               ) : (
                                 <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                                  <button className="btn btn-ghost btn-sm" title="Modifier"
+                                    onClick={() => setEditTarget(r)}>✏️</button>
                                   <button className="btn btn-ghost btn-sm" title="Signaler le décès"
                                     onClick={() => setReportTarget(r)}>☠️</button>
                                   {alreadySelected ? (
@@ -282,6 +293,15 @@ export default function Selection() {
           validationRequired={validationRequired}
           onClose={() => setReportTarget(null)}
           onReported={() => { loadSelection(); runSearch() }}
+        />
+      )}
+
+      {editTarget && (
+        <EditPersonModal
+          person={editTarget}
+          validationRequired={validationRequired}
+          onClose={() => setEditTarget(null)}
+          onProposed={() => { loadSelection(); runSearch() }}
         />
       )}
     </>

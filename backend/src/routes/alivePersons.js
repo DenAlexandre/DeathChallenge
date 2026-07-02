@@ -122,6 +122,47 @@ router.put('/:id/validate', authenticate, requireRole('admin'), async (req, res)
   res.json(rows[0])
 })
 
+router.post('/:id/propose-edit', authenticate, async (req, res) => {
+  const { nom, prenom, categorie, nationalite, date_naissance } = req.body
+  if (!nom?.trim() || !prenom?.trim()) {
+    return res.status(400).json({ error: 'Nom et prénom requis' })
+  }
+
+  const { rows: personRows } = await db.query(
+    `SELECT id FROM "alivePerson" WHERE id = $1 AND statut = 'validee'`,
+    [req.params.id]
+  )
+  if (!personRows[0]) return res.status(404).json({ error: 'Personne non trouvée' })
+
+  const { rows: existingEdit } = await db.query(
+    `SELECT id FROM "alivePersonEdit" WHERE alive_person_id = $1`,
+    [req.params.id]
+  )
+  if (existingEdit[0]) {
+    return res.status(409).json({ error: 'Une modification est déjà en attente de validation pour cette personne' })
+  }
+
+  const validationRegle = await getRegle('validation_admin')
+
+  if (validationRegle?.active === false) {
+    const { rows } = await db.query(
+      `UPDATE "alivePerson" SET nom = $1, prenom = $2, categorie = $3, nationalite = $4, date_naissance = $5
+       WHERE id = $6
+       RETURNING id, nom, prenom, categorie, nationalite, date_naissance, statut`,
+      [nom.trim(), prenom.trim(), categorie || null, nationalite || null, date_naissance || null, req.params.id]
+    )
+    return res.status(200).json({ applied: true, person: rows[0] })
+  }
+
+  const { rows } = await db.query(
+    `INSERT INTO "alivePersonEdit" (alive_person_id, nom, prenom, categorie, nationalite, date_naissance, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING id`,
+    [req.params.id, nom.trim(), prenom.trim(), categorie || null, nationalite || null, date_naissance || null, req.user.id]
+  )
+  res.status(201).json({ applied: false, id: rows[0].id })
+})
+
 router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
   const { rows } = await db.query('DELETE FROM "alivePerson" WHERE id = $1 RETURNING id', [req.params.id])
   if (!rows[0]) return res.status(404).json({ error: 'Personne non trouvée' })

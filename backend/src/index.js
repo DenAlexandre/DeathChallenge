@@ -17,6 +17,7 @@ app.use('/api/alive-persons', require('./routes/alivePersons'))
 app.use('/api/death-persons', require('./routes/deathPersons'))
 app.use('/api/selections',    require('./routes/selections'))
 app.use('/api/regles',        require('./routes/regles'))
+app.use('/api/person-edits',  require('./routes/personEdits'))
 app.get('/api/health',        (req, res) => res.json({ status: 'ok' }))
 
 app.use((err, req, res, next) => {
@@ -119,6 +120,24 @@ async function initDB() {
   await db.query(`ALTER TABLE "alivePerson" DROP CONSTRAINT IF EXISTS aliveperson_statut_check`)
   await db.query(`
     ALTER TABLE "alivePerson" ADD CONSTRAINT aliveperson_statut_check CHECK (statut IN ('en_attente', 'validee', 'decedee'))
+  `)
+
+  // File d'attente des modifications proposées par un joueur sur une personnalité
+  // déjà validée : les nouvelles valeurs ne sont appliquées à alivePerson qu'à la
+  // validation admin. La ligne est supprimée une fois traitée (validée ou rejetée) —
+  // elle ne sert qu'à porter la proposition, pas d'historique à conserver.
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS "alivePersonEdit" (
+      id              SERIAL PRIMARY KEY,
+      alive_person_id INTEGER NOT NULL REFERENCES "alivePerson"(id) ON DELETE CASCADE,
+      nom             VARCHAR(150) NOT NULL,
+      prenom          VARCHAR(150) NOT NULL,
+      categorie       VARCHAR(150),
+      nationalite     VARCHAR(100),
+      date_naissance  DATE,
+      created_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at      TIMESTAMPTZ DEFAULT NOW()
+    )
   `)
 
   await db.query(`
