@@ -6,14 +6,27 @@ import { formatDate } from '../lib/format'
 const STATUT_LABELS = { validee: 'Validée', en_attente: 'En attente' }
 const STATUT_BADGES = { validee: 'badge-alive', en_attente: 'badge-en-attente' }
 
+const PAGE_SIZE = 20
+
 function PersonTable({ title, subtitle, persons, showDeath, setEditTarget }) {
   const [query, setQuery] = useState('')
+  const [page,  setPage]  = useState(1)
 
   const filtered = persons.filter(p => {
     const q = query.trim().toLowerCase()
     if (!q) return true
     return `${p.nom} ${p.prenom}`.toLowerCase().includes(q)
   })
+
+  // Ramène sur une page valide si le filtre réduit le nombre de résultats.
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const currentPage = Math.min(page, pageCount)
+  const pageRows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  const handleQueryChange = (value) => {
+    setQuery(value)
+    setPage(1)
+  }
 
   return (
     <div className="card" style={{ marginBottom: 20 }}>
@@ -26,7 +39,7 @@ function PersonTable({ title, subtitle, persons, showDeath, setEditTarget }) {
         <input
           className="form-input"
           value={query}
-          onChange={e => setQuery(e.target.value)}
+          onChange={e => handleQueryChange(e.target.value)}
           placeholder="Rechercher par nom ou prénom..."
         />
       </div>
@@ -50,7 +63,7 @@ function PersonTable({ title, subtitle, persons, showDeath, setEditTarget }) {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(p => (
+              {pageRows.map(p => (
                 <tr key={p.id}>
                   <td className="fw-600">{p.prenom} {p.nom}</td>
                   <td><span className="badge badge-cat">{p.categorie || '—'}</span></td>
@@ -66,8 +79,25 @@ function PersonTable({ title, subtitle, persons, showDeath, setEditTarget }) {
               ))}
             </tbody>
           </table>
-          <div className="table-footer">
-            <span className="table-count">{filtered.length} / {persons.length}</span>
+          <div className="table-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span className="table-count">
+              {filtered.length} résultat{filtered.length > 1 ? 's' : ''} sur {persons.length}
+            </span>
+            {pageCount > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button className="btn btn-secondary btn-sm"
+                  disabled={currentPage === 1}
+                  onClick={() => setPage(currentPage - 1)}>
+                  ← Précédent
+                </button>
+                <span className="table-count">Page {currentPage} / {pageCount}</span>
+                <button className="btn btn-secondary btn-sm"
+                  disabled={currentPage === pageCount}
+                  onClick={() => setPage(currentPage + 1)}>
+                  Suivant →
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
