@@ -44,11 +44,27 @@ router.post('/', authenticate, async (req, res) => {
 
 router.put('/:id/validate', authenticate, requireRole('admin'), async (req, res) => {
   const { rows } = await db.query(
-    `UPDATE "deathPerson" SET statut = 'validee' WHERE id = $1 RETURNING id, nom, prenom, statut`,
+    `UPDATE "deathPerson" SET statut = 'validee' WHERE id = $1 RETURNING id, nom, prenom, statut, alive_person_id`,
     [req.params.id]
   )
-  if (!rows[0]) return res.status(404).json({ error: 'Personne non trouvée' })
-  res.json(rows[0])
+  const deathPerson = rows[0]
+  if (!deathPerson) return res.status(404).json({ error: 'Personne non trouvée' })
+
+  if (deathPerson.alive_person_id) {
+    const { rows: selectionRows } = await db.query(
+      `SELECT 1 FROM "playerSelection" WHERE alive_person_id = $1 LIMIT 1`,
+      [deathPerson.alive_person_id]
+    )
+    // Un joueur a cette personne dans sa sélection : on la marque décédée au lieu de
+    // la supprimer, pour ne pas perdre (cascade FK) son historique de pari.
+    if (selectionRows[0]) {
+      await db.query(`UPDATE "alivePerson" SET statut = 'decedee' WHERE id = $1`, [deathPerson.alive_person_id])
+    } else {
+      await db.query(`DELETE FROM "alivePerson" WHERE id = $1`, [deathPerson.alive_person_id])
+    }
+  }
+
+  res.json({ id: deathPerson.id, nom: deathPerson.nom, prenom: deathPerson.prenom, statut: deathPerson.statut })
 })
 
 router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {

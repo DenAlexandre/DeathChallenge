@@ -85,6 +85,12 @@ async function initDB() {
       END IF;
     END $$
   `)
+  // Renseigné quand l'entrée provient du signalement d'une personne déjà présente
+  // dans alivePerson (plutôt que d'une proposition de personnalité inédite) : permet,
+  // à la validation, de retrouver la ligne alivePerson à supprimer ou marquer décédée.
+  await db.query(`
+    ALTER TABLE "deathPerson" ADD COLUMN IF NOT EXISTS alive_person_id INTEGER REFERENCES "alivePerson"(id) ON DELETE SET NULL
+  `)
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS "alivePerson" (
@@ -106,13 +112,13 @@ async function initDB() {
   await db.query(`
     ALTER TABLE "alivePerson" ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL
   `)
+  // 'decedee' : la personne a été signalée décédée et validée, mais au moins un joueur
+  // l'avait dans sa sélection — on la conserve (au lieu de la supprimer) pour ne pas
+  // perdre l'historique de son pari. DROP puis ADD (comme pour users.role) pour que les
+  // bases déjà migrées avec l'ancienne contrainte (sans 'decedee') soient mises à jour.
+  await db.query(`ALTER TABLE "alivePerson" DROP CONSTRAINT IF EXISTS aliveperson_statut_check`)
   await db.query(`
-    DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'aliveperson_statut_check') THEN
-        ALTER TABLE "alivePerson"
-          ADD CONSTRAINT aliveperson_statut_check CHECK (statut IN ('en_attente', 'validee'));
-      END IF;
-    END $$
+    ALTER TABLE "alivePerson" ADD CONSTRAINT aliveperson_statut_check CHECK (statut IN ('en_attente', 'validee', 'decedee'))
   `)
 
   await db.query(`

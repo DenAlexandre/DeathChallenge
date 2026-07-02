@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import api from '../api/client'
 import CreatePersonModal from '../components/CreatePersonModal'
+import ReportDeathModal from '../components/ReportDeathModal'
 
 const MAX_SELECTION = 10
 
@@ -21,6 +22,7 @@ export default function Selection() {
   const [searching,    setSearching]  = useState(false)
   const [addError,     setAddError]   = useState('')
   const [showCreate,   setShowCreate] = useState(false)
+  const [reportTarget, setReportTarget] = useState(null)
   const debounceRef = useRef(null)
 
   const loadSelection = () => {
@@ -30,6 +32,18 @@ export default function Selection() {
 
   useEffect(() => { loadSelection() }, [])
 
+  const runSearch = async () => {
+    if (query.trim().length < 2) return
+    setSearching(true)
+    try {
+      const { data } = await api.get('/alive-persons', { params: { q: query.trim() } })
+      setResults(data.results)
+      setDeathMatches(data.deathMatches)
+    } finally {
+      setSearching(false)
+    }
+  }
+
   useEffect(() => {
     clearTimeout(debounceRef.current)
     if (query.trim().length < 2) {
@@ -37,16 +51,7 @@ export default function Selection() {
       setDeathMatches([])
       return
     }
-    debounceRef.current = setTimeout(async () => {
-      setSearching(true)
-      try {
-        const { data } = await api.get('/alive-persons', { params: { q: query.trim() } })
-        setResults(data.results)
-        setDeathMatches(data.deathMatches)
-      } finally {
-        setSearching(false)
-      }
-    }, 350)
+    debounceRef.current = setTimeout(runSearch, 350)
     return () => clearTimeout(debounceRef.current)
   }, [query])
 
@@ -122,9 +127,15 @@ export default function Selection() {
                         )}
                       </td>
                       <td>
-                        <button className="btn btn-ghost btn-sm" title="Retirer"
-                          style={{ color: '#dc2626' }}
-                          onClick={() => handleRemove(p.id)}>🗑️</button>
+                        <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                          {!p.deja_decede && p.statut === 'validee' && (
+                            <button className="btn btn-ghost btn-sm" title="Signaler le décès"
+                              onClick={() => setReportTarget({ id: p.alive_person_id, nom: p.nom, prenom: p.prenom })}>☠️</button>
+                          )}
+                          <button className="btn btn-ghost btn-sm" title="Retirer"
+                            style={{ color: '#dc2626' }}
+                            onClick={() => handleRemove(p.id)}>🗑️</button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -197,12 +208,18 @@ export default function Selection() {
                             <td>
                               {r.deja_decede ? (
                                 <span className="badge badge-deceased">⚠️ Décédée</span>
-                              ) : alreadySelected ? (
-                                <span className="text-muted text-sm">Déjà dans la liste</span>
                               ) : (
-                                <button className="btn btn-primary btn-sm" onClick={() => handleAdd(r.id)}>
-                                  + Ajouter
-                                </button>
+                                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                                  <button className="btn btn-ghost btn-sm" title="Signaler le décès"
+                                    onClick={() => setReportTarget(r)}>☠️</button>
+                                  {alreadySelected ? (
+                                    <span className="text-muted text-sm">Déjà dans la liste</span>
+                                  ) : (
+                                    <button className="btn btn-primary btn-sm" onClick={() => handleAdd(r.id)}>
+                                      + Ajouter
+                                    </button>
+                                  )}
+                                </div>
                               )}
                             </td>
                           </tr>
@@ -223,6 +240,14 @@ export default function Selection() {
           initialPrenom={queryPrenom}
           onClose={() => setShowCreate(false)}
           onCreated={loadSelection}
+        />
+      )}
+
+      {reportTarget && (
+        <ReportDeathModal
+          person={reportTarget}
+          onClose={() => setReportTarget(null)}
+          onReported={() => { loadSelection(); runSearch() }}
         />
       )}
     </>

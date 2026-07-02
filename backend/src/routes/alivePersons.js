@@ -71,6 +71,35 @@ router.post('/', authenticate, async (req, res) => {
   res.status(201).json(rows[0])
 })
 
+router.post('/:id/report-death', authenticate, async (req, res) => {
+  const { date_deces } = req.body
+  if (!date_deces) return res.status(400).json({ error: 'Date de décès requise' })
+
+  const { rows: personRows } = await db.query(
+    `SELECT id, nom, prenom, categorie, nationalite, date_naissance FROM "alivePerson"
+     WHERE id = $1 AND statut = 'validee'`,
+    [req.params.id]
+  )
+  const person = personRows[0]
+  if (!person) return res.status(404).json({ error: 'Personne non trouvée' })
+
+  const { rows: existingDeath } = await db.query(
+    `SELECT id FROM "deathPerson" WHERE lower(nom) = lower($1) AND lower(prenom) = lower($2) AND statut IN ('en_attente', 'validee')`,
+    [person.nom, person.prenom]
+  )
+  if (existingDeath[0]) {
+    return res.status(409).json({ error: 'Un décès est déjà enregistré ou en attente de validation pour cette personne' })
+  }
+
+  const { rows } = await db.query(
+    `INSERT INTO "deathPerson" (nom, prenom, categorie, nationalite, date_naissance, date_deces, statut, created_by, alive_person_id)
+     VALUES ($1, $2, $3, $4, $5, $6, 'en_attente', $7, $8)
+     RETURNING id, nom, prenom, categorie, date_naissance, date_deces, nationalite, statut`,
+    [person.nom, person.prenom, person.categorie, person.nationalite, person.date_naissance, date_deces, req.user.id, person.id]
+  )
+  res.status(201).json(rows[0])
+})
+
 router.put('/:id/validate', authenticate, requireRole('admin'), async (req, res) => {
   const { rows } = await db.query(
     `UPDATE "alivePerson" SET statut = 'validee' WHERE id = $1 RETURNING id, nom, prenom, statut`,
