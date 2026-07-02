@@ -12,7 +12,6 @@ app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173', crede
 app.use(express.json())
 
 app.use('/api/auth',    require('./routes/auth'))
-app.use('/api/persons', require('./routes/persons'))
 app.use('/api/users',   require('./routes/users'))
 app.get('/api/health',  (req, res) => res.json({ status: 'ok' }))
 
@@ -48,23 +47,6 @@ async function initDB() {
   `)
 
   await db.query(`
-    CREATE TABLE IF NOT EXISTS persons (
-      id             SERIAL PRIMARY KEY,
-      nom            VARCHAR(100) NOT NULL,
-      prenom         VARCHAR(100) NOT NULL,
-      date_naissance DATE,
-      nationalite    VARCHAR(100),
-      categorie      VARCHAR(100),
-      description    TEXT,
-      is_alive       BOOLEAN      NOT NULL DEFAULT true,
-      deceased_at    DATE,
-      created_at     TIMESTAMPTZ  DEFAULT NOW(),
-      updated_at     TIMESTAMPTZ  DEFAULT NOW(),
-      created_by     INTEGER      REFERENCES users(id) ON DELETE SET NULL
-    )
-  `)
-
-  await db.query(`
     CREATE TABLE IF NOT EXISTS "deathPerson" (
       id             SERIAL PRIMARY KEY,
       nom            VARCHAR(150),
@@ -78,20 +60,15 @@ async function initDB() {
   `)
 
   await db.query(`
-    CREATE OR REPLACE FUNCTION update_updated_at()
-    RETURNS TRIGGER AS $$
-    BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
-    $$ LANGUAGE plpgsql
-  `)
-
-  await db.query(`
-    DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'persons_updated_at') THEN
-        CREATE TRIGGER persons_updated_at
-          BEFORE UPDATE ON persons
-          FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-      END IF;
-    END $$
+    CREATE TABLE IF NOT EXISTS "alivePerson" (
+      id              SERIAL PRIMARY KEY,
+      nom             VARCHAR(150),
+      prenom          VARCHAR(150),
+      categorie       VARCHAR(150),
+      annee_naissance INTEGER,
+      nationalite     VARCHAR(100),
+      a_verifier      TEXT
+    )
   `)
 }
 
@@ -176,6 +153,30 @@ async function seedDeathPersons() {
   console.log(`${records.length} personnalités décédées importées dans deathPerson`)
 }
 
+async function seedAlivePersons() {
+  const { rows } = await db.query('SELECT COUNT(*)::int AS count FROM "alivePerson"')
+  if (rows[0].count > 0) return
+
+  const csvPath = path.join(__dirname, 'data', 'alivePerson.csv')
+  const records = parseCsv(fs.readFileSync(csvPath, 'utf8'))
+
+  for (const r of records) {
+    await db.query(
+      `INSERT INTO "alivePerson" (nom, prenom, categorie, annee_naissance, nationalite, a_verifier)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        r.nom || null,
+        r.prenom || null,
+        r.categorie || null,
+        r.annee_naissance || null,
+        r.nationalite || null,
+        r.a_verifier || null,
+      ]
+    )
+  }
+  console.log(`${records.length} personnalités vivantes importées dans alivePerson`)
+}
+
 const PORT = process.env.PORT || 3001
 
 ;(async () => {
@@ -184,6 +185,7 @@ const PORT = process.env.PORT || 3001
     await initDB()
     await seed()
     await seedDeathPersons()
+    await seedAlivePersons()
     app.listen(PORT, () => console.log(`Backend démarré sur http://localhost:${PORT}`))
   } catch (err) {
     console.error('Erreur au démarrage :', err.message)

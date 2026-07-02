@@ -21,7 +21,7 @@ export default function Login() {
     setLoading(true)
     try {
       await login(form.username, form.password)
-      navigate('/persons')
+      navigate('/users')
     } catch (err) {
       setError(err.response?.data?.error || 'Erreur de connexion')
     } finally {

@@ -41,31 +41,29 @@ In production the proxy is removed; the frontend build is served separately and 
 ### Auth
 JWT stored in `localStorage` (`dc_token`, `dc_user`). The Axios client in `frontend/src/api/client.js` injects `Authorization: Bearer <token>` on every request and redirects to `/login` on 401. The backend verifies the token in `backend/src/middleware/auth.js` via `authenticate`, then `requireRole(...roles)` enforces RBAC.
 
-Three roles: **admin** (full CRUD on persons + users), **editor** (read + write persons), **viewer** (read only).
+Three roles: **admin** (full CRUD on users), **editor** and **viewer** (read-only access to the users list).
 
 ### Backend structure
 - `src/index.js` — entry point: Express setup, DB init (`CREATE TABLE IF NOT EXISTS`), seed, server start
 - `src/db/index.js` — single `pg.Pool` exported as `{ query, pool }`
 - `src/middleware/auth.js` — `authenticate` + `requireRole` middlewares
 - `src/routes/auth.js` — `POST /api/auth/login`, `GET /api/auth/me`
-- `src/routes/persons.js` — CRUD + `GET /api/persons/stats`
-- `src/routes/users.js` — admin-only CRUD (password never returned)
+- `src/routes/users.js` — `GET /` open to any authenticated role, `POST`/`PUT`/`DELETE` admin-only (password never returned)
 
 All DB queries use parameterised `$1, $2, …` placeholders (no ORM).
 
 ### Frontend structure
 - `src/api/client.js` — pre-configured Axios instance (baseURL `/api`, auth interceptor, 401 redirect)
 - `src/contexts/AuthContext.jsx` — `user`, `loading`, `login()`, `logout()` via React context
-- `src/App.jsx` — route tree with `ProtectedRoute` (auth + optional role check) and `PublicRoute`
-- Pages: `Login`, `Persons` (main list), `Users` (admin only)
-- Components: `Layout` (nav shell), `PersonModal`, `UserModal`
+- `src/App.jsx` — route tree with `ProtectedRoute` (auth check) and `PublicRoute`
+- Pages: `Login`, `Users` (list open to all roles; write actions gated to admin in the UI)
+- Components: `Layout` (nav shell), `UserModal`
 
 ### Data model
-**persons**: `id`, `nom`, `prenom`, `date_naissance`, `nationalite`, `categorie`, `description`, `is_alive` (bool, default `true`), `deceased_at`, `created_by` (FK → users), `created_at`, `updated_at` (auto-trigger)
-
 **users**: `id`, `username` (unique), `email`, `password_hash`, `role` (`admin|editor|viewer`), `created_at`
+
+**deathPerson** (quote the identifier in SQL — mixed case): `id`, `nom`, `prenom`, `categorie`, `date_naissance`, `date_deces`, `nationalite`, `a_verifier`. Seeded automatically from `src/data/deathPerson.csv` on first start (only if the table is empty).
 
 ### Key constraints
 - `DELETE /api/users/:id` blocks self-deletion (returns 400)
-- Persons `updated_at` is managed by a PostgreSQL trigger, not application code
 - The Vite proxy (`/api` → `:3001`) only applies in dev; `frontend/src/api/client.js` uses `baseURL: '/api'` (relative), so it works in both environments
