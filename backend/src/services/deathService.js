@@ -10,6 +10,8 @@ function calculateAge(dateNaissance, dateDeces) {
   return age
 }
 
+const MIN_POINTS = 10
+
 // Applique un décès considéré comme acquis (validé par un admin, ou immédiat si
 // la règle "validation_admin" est désactivée) : renseigne date_deces (qui fait
 // foi), efface tout signalement en attente, et attribue les points (si la règle
@@ -26,7 +28,7 @@ async function applyDeath(personId, dateDeces, pointsRuleActive) {
 
   if (pointsRuleActive) {
     const age = calculateAge(rows[0].date_naissance, dateDeces)
-    const points = age === null ? 0 : Math.max(0, 100 - age)
+    const points = age === null ? MIN_POINTS : Math.max(MIN_POINTS, 100 - age)
     await db.query(`UPDATE "playerSelection" SET points = $1 WHERE person_id = $2`, [points, personId])
   }
   return true

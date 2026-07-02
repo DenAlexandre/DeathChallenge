@@ -194,7 +194,7 @@ async function initDB() {
       END IF;
     END $$
   `)
-  // Renseigné (100 - âge au décès, min 0) quand la personne sélectionnée décède et que
+  // Renseigné (100 - âge au décès, min 10) quand la personne sélectionnée décède et que
   // le décès est validé par un admin ; reste NULL tant qu'elle est vivante.
   await db.query(`ALTER TABLE "playerSelection" ADD COLUMN IF NOT EXISTS points INTEGER`)
 
@@ -244,7 +244,7 @@ async function seedRegles() {
     {
       code: 'points_calcul',
       nom: 'Calcul des points au décès',
-      description: "Attribue (100 - âge au décès, minimum 0) points à chaque joueur ayant sélectionné la personne, lors de la validation du décès.",
+      description: "Attribue (100 - âge au décès, minimum 10) points à chaque joueur ayant sélectionné la personne, lors de la validation du décès.",
       valeur: null,
     },
     {
@@ -262,7 +262,8 @@ async function seedRegles() {
   ]
   for (const r of defaults) {
     await db.query(
-      `INSERT INTO "regles" (code, nom, description, valeur) VALUES ($1, $2, $3, $4) ON CONFLICT (code) DO NOTHING`,
+      `INSERT INTO "regles" (code, nom, description, valeur) VALUES ($1, $2, $3, $4)
+       ON CONFLICT (code) DO UPDATE SET description = EXCLUDED.description`,
       [r.code, r.nom, r.description, r.valeur]
     )
   }

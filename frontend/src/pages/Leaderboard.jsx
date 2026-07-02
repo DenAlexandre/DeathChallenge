@@ -16,7 +16,7 @@ export default function Leaderboard() {
       <div className="page-header">
         <div>
           <div className="page-title">Classement</div>
-          <div className="page-subtitle">Points cumulés par utilisateur (100 - âge au décès, minimum 0)</div>
+          <div className="page-subtitle">Points cumulés par utilisateur (100 - âge au décès, minimum 10)</div>
         </div>
       </div>
 
