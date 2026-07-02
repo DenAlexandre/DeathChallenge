@@ -11,10 +11,11 @@ router.get('/', authenticate, async (req, res) => {
   const like = `%${q}%`
 
   const { rows: results } = await db.query(
-    `SELECT ap.id, ap.nom, ap.prenom, ap.categorie, ap.annee_naissance, ap.nationalite, ap.statut,
+    `SELECT ap.id, ap.nom, ap.prenom, ap.categorie, ap.annee_naissance, ap.date_naissance, ap.nationalite, ap.statut,
             EXISTS (
               SELECT 1 FROM "deathPerson" dp
-              WHERE lower(dp.nom) = lower(ap.nom) AND lower(dp.prenom) = lower(ap.prenom)
+              WHERE dp.statut = 'validee'
+                AND lower(dp.nom) = lower(ap.nom) AND lower(dp.prenom) = lower(ap.prenom)
             ) AS deja_decede
      FROM "alivePerson" ap
      WHERE ap.statut = 'validee' AND (ap.nom ILIKE $1 OR ap.prenom ILIKE $1)
@@ -25,7 +26,7 @@ router.get('/', authenticate, async (req, res) => {
 
   const { rows: deathMatches } = await db.query(
     `SELECT nom, prenom, categorie, date_deces FROM "deathPerson"
-     WHERE nom ILIKE $1 OR prenom ILIKE $1
+     WHERE statut = 'validee' AND (nom ILIKE $1 OR prenom ILIKE $1)
      LIMIT 5`,
     [like]
   )
@@ -35,7 +36,7 @@ router.get('/', authenticate, async (req, res) => {
 
 router.get('/pending', authenticate, requireRole('admin'), async (req, res) => {
   const { rows } = await db.query(
-    `SELECT ap.id, ap.nom, ap.prenom, ap.categorie, ap.annee_naissance, ap.nationalite,
+    `SELECT ap.id, ap.nom, ap.prenom, ap.categorie, ap.annee_naissance, ap.date_naissance, ap.nationalite,
             u.username AS proposed_by
      FROM "alivePerson" ap
      LEFT JOIN users u ON u.id = ap.created_by
@@ -46,7 +47,7 @@ router.get('/pending', authenticate, requireRole('admin'), async (req, res) => {
 })
 
 router.post('/', authenticate, async (req, res) => {
-  const { nom, prenom, categorie, nationalite, annee_naissance } = req.body
+  const { nom, prenom, categorie, nationalite, date_naissance } = req.body
   if (!nom?.trim() || !prenom?.trim()) {
     return res.status(400).json({ error: 'Nom et prénom requis' })
   }
@@ -59,11 +60,13 @@ router.post('/', authenticate, async (req, res) => {
     return res.status(409).json({ error: 'Cette personne existe déjà dans la base' })
   }
 
+  const anneeNaissance = date_naissance ? new Date(date_naissance).getFullYear() : null
+
   const { rows } = await db.query(
-    `INSERT INTO "alivePerson" (nom, prenom, categorie, nationalite, annee_naissance, statut, created_by)
-     VALUES ($1, $2, $3, $4, $5, 'en_attente', $6)
-     RETURNING id, nom, prenom, categorie, annee_naissance, nationalite, statut`,
-    [nom.trim(), prenom.trim(), categorie || null, nationalite || null, annee_naissance || null, req.user.id]
+    `INSERT INTO "alivePerson" (nom, prenom, categorie, nationalite, date_naissance, annee_naissance, statut, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, 'en_attente', $7)
+     RETURNING id, nom, prenom, categorie, annee_naissance, date_naissance, nationalite, statut`,
+    [nom.trim(), prenom.trim(), categorie || null, nationalite || null, date_naissance || null, anneeNaissance, req.user.id]
   )
   res.status(201).json(rows[0])
 })

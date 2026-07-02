@@ -9,10 +9,11 @@ const MAX_SELECTION = 10
 router.get('/', authenticate, async (req, res) => {
   const { rows } = await db.query(
     `SELECT s.id, ap.id AS alive_person_id, ap.nom, ap.prenom, ap.categorie,
-            ap.annee_naissance, ap.nationalite, ap.statut,
+            ap.annee_naissance, ap.date_naissance, ap.nationalite, ap.statut,
             EXISTS (
               SELECT 1 FROM "deathPerson" dp
-              WHERE lower(dp.nom) = lower(ap.nom) AND lower(dp.prenom) = lower(ap.prenom)
+              WHERE dp.statut = 'validee'
+                AND lower(dp.nom) = lower(ap.nom) AND lower(dp.prenom) = lower(ap.prenom)
             ) AS deja_decede
      FROM "playerSelection" s
      JOIN "alivePerson" ap ON ap.id = s.alive_person_id
@@ -40,7 +41,7 @@ router.post('/', authenticate, async (req, res) => {
   if (!person) return res.status(404).json({ error: 'Personne non trouvée' })
 
   const { rows: deathRows } = await db.query(
-    `SELECT 1 FROM "deathPerson" WHERE lower(nom) = lower($1) AND lower(prenom) = lower($2)`,
+    `SELECT 1 FROM "deathPerson" WHERE statut = 'validee' AND lower(nom) = lower($1) AND lower(prenom) = lower($2)`,
     [person.nom, person.prenom]
   )
   if (deathRows[0]) {

@@ -14,6 +14,7 @@ app.use(express.json())
 app.use('/api/auth',          require('./routes/auth'))
 app.use('/api/users',         require('./routes/users'))
 app.use('/api/alive-persons', require('./routes/alivePersons'))
+app.use('/api/death-persons', require('./routes/deathPersons'))
 app.use('/api/selections',    require('./routes/selections'))
 app.get('/api/health',        (req, res) => res.json({ status: 'ok' }))
 
@@ -82,6 +83,22 @@ async function initDB() {
     )
   `)
 
+  // Comme pour alivePerson : les joueurs peuvent signaler un décès absent de la
+  // base scrapée. La ligne reste "en_attente" (non prise en compte comme décès
+  // avéré) tant qu'un admin ne l'a pas validée.
+  await db.query(`ALTER TABLE "deathPerson" ADD COLUMN IF NOT EXISTS statut VARCHAR(20) DEFAULT 'validee'`)
+  await db.query(`
+    ALTER TABLE "deathPerson" ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL
+  `)
+  await db.query(`
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'deathperson_statut_check') THEN
+        ALTER TABLE "deathPerson"
+          ADD CONSTRAINT deathperson_statut_check CHECK (statut IN ('en_attente', 'validee'));
+      END IF;
+    END $$
+  `)
+
   await db.query(`
     CREATE TABLE IF NOT EXISTS "alivePerson" (
       id              SERIAL PRIMARY KEY,
@@ -94,6 +111,10 @@ async function initDB() {
     )
   `)
 
+  // date_naissance (jour/mois/année) complète date_naissance qui, pour les
+  // premières données scrapées, ne comportait que l'année (annee_naissance,
+  // conservée comme repli quand la date exacte est inconnue).
+  await db.query(`ALTER TABLE "alivePerson" ADD COLUMN IF NOT EXISTS date_naissance DATE`)
   await db.query(`ALTER TABLE "alivePerson" ADD COLUMN IF NOT EXISTS statut VARCHAR(20) DEFAULT 'validee'`)
   await db.query(`
     ALTER TABLE "alivePerson" ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL
@@ -207,13 +228,14 @@ async function seedAlivePersons() {
 
   for (const r of records) {
     await db.query(
-      `INSERT INTO "alivePerson" (nom, prenom, categorie, annee_naissance, nationalite, a_verifier)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+      `INSERT INTO "alivePerson" (nom, prenom, categorie, annee_naissance, date_naissance, nationalite, a_verifier)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
         r.nom || null,
         r.prenom || null,
         r.categorie || null,
         r.annee_naissance || null,
+        r.date_naissance || null,
         r.nationalite || null,
         r.a_verifier || null,
       ]

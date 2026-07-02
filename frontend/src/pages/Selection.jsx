@@ -4,6 +4,14 @@ import CreatePersonModal from '../components/CreatePersonModal'
 
 const MAX_SELECTION = 10
 
+function formatBirth(p) {
+  if (p.date_naissance) {
+    const [y, m, d] = p.date_naissance.split('-')
+    return `${d}/${m}/${y}`
+  }
+  return p.annee_naissance || '—'
+}
+
 export default function Selection() {
   const [mySelection, setMySelection] = useState([])
   const [loading,      setLoading]    = useState(true)
@@ -103,7 +111,7 @@ export default function Selection() {
                       <td className="fw-600">{p.prenom} {p.nom}</td>
                       <td><span className="badge badge-cat">{p.categorie || '—'}</span></td>
                       <td className="text-muted text-sm">{p.nationalite || '—'}</td>
-                      <td className="text-muted text-sm">{p.annee_naissance || '—'}</td>
+                      <td className="text-muted text-sm">{formatBirth(p)}</td>
                       <td>
                         {p.deja_decede && <span className="badge badge-deceased">⚠️ Décédée</span>}
                         {!p.deja_decede && p.statut === 'en_attente' && (
@@ -185,7 +193,7 @@ export default function Selection() {
                             <td className="fw-600">{r.prenom} {r.nom}</td>
                             <td><span className="badge badge-cat">{r.categorie || '—'}</span></td>
                             <td className="text-muted text-sm">{r.nationalite || '—'}</td>
-                            <td className="text-muted text-sm">{r.annee_naissance || '—'}</td>
+                            <td className="text-muted text-sm">{formatBirth(r)}</td>
                             <td>
                               {r.deja_decede ? (
                                 <span className="badge badge-deceased">⚠️ Décédée</span>
