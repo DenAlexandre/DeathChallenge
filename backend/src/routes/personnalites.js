@@ -36,8 +36,9 @@ router.get('/', authenticate, async (req, res) => {
 
 router.get('/all', authenticate, requireRole('admin'), async (req, res) => {
   const { rows } = await db.query(
-    `SELECT id, nom, prenom, categorie, nationalite, date_naissance, date_deces, statut
-     FROM "personnalite" ORDER BY nom, prenom`
+    `SELECT p.id, p.nom, p.prenom, p.categorie, p.nationalite, p.date_naissance, p.date_deces, p.statut,
+            (SELECT COUNT(*)::int FROM "playerSelection" s WHERE s.person_id = p.id) AS selections
+     FROM "personnalite" p ORDER BY p.nom, p.prenom`
   )
   res.json(rows)
 })
@@ -91,8 +92,11 @@ router.post('/', authenticate, async (req, res) => {
     return res.status(409).json({ error: 'Cette personne existe déjà dans la base' })
   }
 
-  const validationRegle = await getRegle('validation_admin')
-  const statut = validationRegle?.active === false ? 'validee' : 'en_attente'
+  let statut = 'validee'
+  if (req.user.role !== 'admin') {
+    const validationRegle = await getRegle('validation_admin')
+    statut = validationRegle?.active === false ? 'validee' : 'en_attente'
+  }
 
   const { rows } = await db.query(
     `INSERT INTO "personnalite" (nom, prenom, categorie, nationalite, date_naissance, date_deces, statut, created_by)

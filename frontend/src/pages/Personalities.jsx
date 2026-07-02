@@ -8,7 +8,7 @@ const STATUT_BADGES = { validee: 'badge-alive', en_attente: 'badge-en-attente' }
 
 const PAGE_SIZE = 20
 
-function PersonTable({ title, subtitle, persons, showDeath, setEditTarget }) {
+function PersonTable({ title, subtitle, persons, showDeath, setEditTarget, setDeleteTarget }) {
   const [query, setQuery] = useState('')
   const [page,  setPage]  = useState(1)
 
@@ -59,7 +59,7 @@ function PersonTable({ title, subtitle, persons, showDeath, setEditTarget }) {
                 <th>Naissance</th>
                 {showDeath && <th>Décès</th>}
                 <th>Statut</th>
-                <th style={{ width: 50 }}></th>
+                <th style={{ width: 80 }}></th>
               </tr>
             </thead>
             <tbody>
@@ -72,8 +72,13 @@ function PersonTable({ title, subtitle, persons, showDeath, setEditTarget }) {
                   {showDeath && <td className="text-muted text-sm">{formatDate(p.date_deces)}</td>}
                   <td><span className={`badge ${STATUT_BADGES[p.statut] || ''}`}>{STATUT_LABELS[p.statut] || p.statut}</span></td>
                   <td>
-                    <button className="btn btn-ghost btn-sm" title="Modifier"
-                      onClick={() => setEditTarget(p)}>✏️</button>
+                    <div style={{ display: 'flex', gap: 2 }}>
+                      <button className="btn btn-ghost btn-sm" title="Modifier"
+                        onClick={() => setEditTarget(p)}>✏️</button>
+                      <button className="btn btn-ghost btn-sm" title="Supprimer"
+                        style={{ color: '#dc2626' }}
+                        onClick={() => setDeleteTarget(p)}>🗑️</button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -106,9 +111,12 @@ function PersonTable({ title, subtitle, persons, showDeath, setEditTarget }) {
 }
 
 export default function Personalities() {
-  const [persons,    setPersons]    = useState([])
-  const [loading,    setLoading]    = useState(true)
-  const [editTarget, setEditTarget] = useState(null)
+  const [persons,      setPersons]      = useState([])
+  const [loading,      setLoading]      = useState(true)
+  const [showCreate,   setShowCreate]   = useState(false)
+  const [editTarget,   setEditTarget]   = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting,     setDeleting]     = useState(false)
 
   const load = () => {
     setLoading(true)
@@ -117,8 +125,24 @@ export default function Personalities() {
 
   useEffect(() => { load() }, [])
 
-  const handleSaved = (updated) => {
-    setPersons(list => list.map(p => p.id === updated.id ? updated : p))
+  const handleSaved = (saved) => {
+    setPersons(list => {
+      const exists = list.some(p => p.id === saved.id)
+      if (exists) return list.map(p => p.id === saved.id ? { ...p, ...saved } : p)
+      return [...list, { selections: 0, ...saved }]
+    })
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await api.delete(`/personnalites/${deleteTarget.id}`)
+      setPersons(list => list.filter(p => p.id !== deleteTarget.id))
+      setDeleteTarget(null)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const alive = persons.filter(p => !p.date_deces)
@@ -131,6 +155,9 @@ export default function Personalities() {
           <div className="page-title">Personnalités</div>
           <div className="page-subtitle">Toutes les personnalités vivantes et décédées de la base</div>
         </div>
+        <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+          + Ajouter une personnalité
+        </button>
       </div>
 
       <div className="page-body">
@@ -143,6 +170,7 @@ export default function Personalities() {
               subtitle="Personnalités sélectionnables par les joueurs"
               persons={alive}
               setEditTarget={setEditTarget}
+              setDeleteTarget={setDeleteTarget}
             />
             <PersonTable
               title="Décédées"
@@ -150,10 +178,19 @@ export default function Personalities() {
               persons={dead}
               showDeath
               setEditTarget={setEditTarget}
+              setDeleteTarget={setDeleteTarget}
             />
           </>
         )}
       </div>
+
+      {showCreate && (
+        <AdminPersonModal
+          person={null}
+          onClose={() => setShowCreate(false)}
+          onSaved={handleSaved}
+        />
+      )}
 
       {editTarget && (
         <AdminPersonModal
@@ -161,6 +198,38 @@ export default function Personalities() {
           onClose={() => setEditTarget(null)}
           onSaved={handleSaved}
         />
+      )}
+
+      {deleteTarget && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: 420 }}>
+            <div className="modal-header">
+              <div className="modal-title">Supprimer cette personnalité</div>
+              <button className="modal-close" onClick={() => setDeleteTarget(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="confirm-body">
+                <div className="confirm-icon">⚠️</div>
+                <div className="confirm-title">
+                  Supprimer {deleteTarget.prenom} {deleteTarget.nom} ?
+                </div>
+                <div className="confirm-text">
+                  Cette action est irréversible.
+                  {deleteTarget.selections > 0 && (
+                    <> <strong>{deleteTarget.selections} joueur{deleteTarget.selections > 1 ? 's ont' : ' a'}</strong> cette
+                    personne dans sa sélection — leur historique de pari (et points éventuels) sera perdu.</>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setDeleteTarget(null)}>Annuler</button>
+              <button className="btn btn-danger" onClick={handleDelete} disabled={deleting}>
+                {deleting ? 'Suppression...' : 'Supprimer'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   )

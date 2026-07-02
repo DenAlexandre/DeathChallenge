@@ -3,23 +3,25 @@ import api from '../api/client'
 import { CATEGORIES_SUGGESTIONS, NATIONALITES } from '../lib/personOptions'
 import { today } from '../lib/format'
 
-// Édition directe par un admin, appliquée immédiatement (pas de file de
-// validation : l'admin a déjà l'autorité). La date de décès est éditable
-// librement : la renseigner marque la personne décédée (points attribués
-// côté backend), la vider la considère vivante.
+// Création ou édition directe par un admin, appliquée immédiatement (pas de
+// file de validation : l'admin a déjà l'autorité). person=null => création.
+// La date de décès est éditable librement : la renseigner marque la personne
+// décédée (points attribués côté backend si elle est déjà sélectionnée), la
+// vider la considère vivante.
 export default function AdminPersonModal({ person, onClose, onSaved }) {
+  const isEdit = Boolean(person)
   const [form, setForm] = useState({
-    nom: person.nom || '',
-    prenom: person.prenom || '',
-    categorie: person.categorie || '',
-    nationalite: person.nationalite || '',
-    date_naissance: person.date_naissance || '',
-    date_deces: person.date_deces || '',
+    nom: person?.nom || '',
+    prenom: person?.prenom || '',
+    categorie: person?.categorie || '',
+    nationalite: person?.nationalite || '',
+    date_naissance: person?.date_naissance || '',
+    date_deces: person?.date_deces || '',
   })
   const [error,  setError]  = useState('')
   const [saving, setSaving] = useState(false)
   const [nationaliteAutre, setNationaliteAutre] = useState(
-    Boolean(person.nationalite) && !NATIONALITES.includes(person.nationalite)
+    Boolean(person?.nationalite) && !NATIONALITES.includes(person.nationalite)
   )
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
@@ -39,18 +41,21 @@ export default function AdminPersonModal({ person, onClose, onSaved }) {
     setError('')
     setSaving(true)
     try {
-      const { data } = await api.put(`/personnalites/${person.id}`, {
+      const payload = {
         nom: form.nom,
         prenom: form.prenom,
         categorie: form.categorie,
         nationalite: form.nationalite,
         date_naissance: form.date_naissance || null,
         date_deces: form.date_deces || null,
-      })
+      }
+      const { data } = isEdit
+        ? await api.put(`/personnalites/${person.id}`, payload)
+        : await api.post('/personnalites', payload)
       onSaved(data)
       onClose()
     } catch (err) {
-      setError(err.response?.data?.error || 'Erreur lors de la modification')
+      setError(err.response?.data?.error || 'Erreur lors de l\'enregistrement')
     } finally {
       setSaving(false)
     }
@@ -60,7 +65,9 @@ export default function AdminPersonModal({ person, onClose, onSaved }) {
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal" style={{ maxWidth: 440 }}>
         <div className="modal-header">
-          <div className="modal-title">Modifier {person.prenom} {person.nom}</div>
+          <div className="modal-title">
+            {isEdit ? `Modifier ${person.prenom} ${person.nom}` : 'Ajouter une personnalité'}
+          </div>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
 
