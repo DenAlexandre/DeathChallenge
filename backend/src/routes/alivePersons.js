@@ -13,7 +13,7 @@ router.get('/', authenticate, async (req, res) => {
   const like = `%${q}%`
 
   const { rows: results } = await db.query(
-    `SELECT ap.id, ap.nom, ap.prenom, ap.categorie, ap.annee_naissance, ap.date_naissance, ap.nationalite, ap.statut,
+    `SELECT ap.id, ap.nom, ap.prenom, ap.categorie, ap.date_naissance, ap.nationalite, ap.statut,
             EXISTS (
               SELECT 1 FROM "deathPerson" dp
               WHERE dp.statut = 'validee'
@@ -38,7 +38,7 @@ router.get('/', authenticate, async (req, res) => {
 
 router.get('/pending', authenticate, requireRole('admin'), async (req, res) => {
   const { rows } = await db.query(
-    `SELECT ap.id, ap.nom, ap.prenom, ap.categorie, ap.annee_naissance, ap.date_naissance, ap.nationalite,
+    `SELECT ap.id, ap.nom, ap.prenom, ap.categorie, ap.date_naissance, ap.nationalite,
             u.username AS proposed_by
      FROM "alivePerson" ap
      LEFT JOIN users u ON u.id = ap.created_by
@@ -62,16 +62,14 @@ router.post('/', authenticate, async (req, res) => {
     return res.status(409).json({ error: 'Cette personne existe déjà dans la base' })
   }
 
-  const anneeNaissance = date_naissance ? new Date(date_naissance).getFullYear() : null
-
   const validationRegle = await getRegle('validation_admin')
   const statut = validationRegle?.active === false ? 'validee' : 'en_attente'
 
   const { rows } = await db.query(
-    `INSERT INTO "alivePerson" (nom, prenom, categorie, nationalite, date_naissance, annee_naissance, statut, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-     RETURNING id, nom, prenom, categorie, annee_naissance, date_naissance, nationalite, statut`,
-    [nom.trim(), prenom.trim(), categorie || null, nationalite || null, date_naissance || null, anneeNaissance, statut, req.user.id]
+    `INSERT INTO "alivePerson" (nom, prenom, categorie, nationalite, date_naissance, statut, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING id, nom, prenom, categorie, date_naissance, nationalite, statut`,
+    [nom.trim(), prenom.trim(), categorie || null, nationalite || null, date_naissance || null, statut, req.user.id]
   )
   res.status(201).json(rows[0])
 })

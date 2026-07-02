@@ -99,16 +99,15 @@ async function initDB() {
       nom             VARCHAR(150),
       prenom          VARCHAR(150),
       categorie       VARCHAR(150),
-      annee_naissance INTEGER,
       nationalite     VARCHAR(100),
       a_verifier      TEXT
     )
   `)
 
-  // date_naissance (jour/mois/année) complète date_naissance qui, pour les
-  // premières données scrapées, ne comportait que l'année (annee_naissance,
-  // conservée comme repli quand la date exacte est inconnue).
   await db.query(`ALTER TABLE "alivePerson" ADD COLUMN IF NOT EXISTS date_naissance DATE`)
+  // Ancien repli utilisé quand la date exacte de naissance n'était pas connue
+  // (données scrapées) — retiré, date_naissance est désormais la seule source.
+  await db.query(`ALTER TABLE "alivePerson" DROP COLUMN IF EXISTS annee_naissance`)
   await db.query(`ALTER TABLE "alivePerson" ADD COLUMN IF NOT EXISTS statut VARCHAR(20) DEFAULT 'validee'`)
   await db.query(`
     ALTER TABLE "alivePerson" ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL
@@ -269,13 +268,12 @@ async function seedAlivePersons() {
 
   for (const r of records) {
     await db.query(
-      `INSERT INTO "alivePerson" (nom, prenom, categorie, annee_naissance, date_naissance, nationalite, a_verifier)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      `INSERT INTO "alivePerson" (nom, prenom, categorie, date_naissance, nationalite, a_verifier)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
       [
         r.nom || null,
         r.prenom || null,
         r.categorie || null,
-        r.annee_naissance || null,
         r.date_naissance || null,
         r.nationalite || null,
         r.a_verifier || null,

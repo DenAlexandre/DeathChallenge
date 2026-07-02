@@ -1,16 +1,13 @@
 const db = require('../db')
 
-function calculateAge(dateNaissance, anneeNaissance, dateDeces) {
+function calculateAge(dateNaissance, dateDeces) {
+  if (!dateNaissance) return null
   const death = new Date(dateDeces)
-  if (dateNaissance) {
-    const birth = new Date(dateNaissance)
-    let age = death.getFullYear() - birth.getFullYear()
-    const monthDiff = death.getMonth() - birth.getMonth()
-    if (monthDiff < 0 || (monthDiff === 0 && death.getDate() < birth.getDate())) age--
-    return age
-  }
-  if (anneeNaissance) return death.getFullYear() - anneeNaissance
-  return null
+  const birth = new Date(dateNaissance)
+  let age = death.getFullYear() - birth.getFullYear()
+  const monthDiff = death.getMonth() - birth.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && death.getDate() < birth.getDate())) age--
+  return age
 }
 
 // Applique les conséquences d'un décès considéré comme acquis (validé par un admin, ou
@@ -20,7 +17,7 @@ function calculateAge(dateNaissance, anneeNaissance, dateDeces) {
 // ne pas perdre — via la cascade FK — son historique de pari).
 async function applyDeathToAlivePerson(alivePersonId, dateDeces, pointsRuleActive) {
   const { rows: personRows } = await db.query(
-    `SELECT date_naissance, annee_naissance FROM "alivePerson" WHERE id = $1`,
+    `SELECT date_naissance FROM "alivePerson" WHERE id = $1`,
     [alivePersonId]
   )
   const { rows: selectionRows } = await db.query(
@@ -29,7 +26,7 @@ async function applyDeathToAlivePerson(alivePersonId, dateDeces, pointsRuleActiv
   )
 
   if (pointsRuleActive && selectionRows[0] && personRows[0]) {
-    const age = calculateAge(personRows[0].date_naissance, personRows[0].annee_naissance, dateDeces)
+    const age = calculateAge(personRows[0].date_naissance, dateDeces)
     const points = age === null ? 0 : Math.max(0, 100 - age)
     await db.query(`UPDATE "playerSelection" SET points = $1 WHERE alive_person_id = $2`, [points, alivePersonId])
   }

@@ -8,7 +8,17 @@ function formatDate(iso) {
 }
 
 function formatBirth(p) {
-  return p.date_naissance ? formatDate(p.date_naissance) : (p.annee_naissance || '—')
+  return formatDate(p.date_naissance)
+}
+
+function formatAge(dateNaissance, referenceDate) {
+  if (!dateNaissance) return '—'
+  const birth = new Date(dateNaissance)
+  const ref = referenceDate ? new Date(referenceDate) : new Date()
+  let age = ref.getFullYear() - birth.getFullYear()
+  const monthDiff = ref.getMonth() - birth.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && ref.getDate() < birth.getDate())) age--
+  return `${age} ans`
 }
 
 function PendingSection({ title, subtitle, emptyText, endpoint, showDeath }) {
@@ -65,6 +75,7 @@ function PendingSection({ title, subtitle, emptyText, endpoint, showDeath }) {
                 <th>Catégorie</th>
                 <th>Nationalité</th>
                 <th>Naissance</th>
+                <th>Âge</th>
                 {showDeath && <th>Décès</th>}
                 <th>Proposé par</th>
                 <th style={{ width: 170 }}></th>
@@ -77,6 +88,7 @@ function PendingSection({ title, subtitle, emptyText, endpoint, showDeath }) {
                   <td><span className="badge badge-cat">{p.categorie || '—'}</span></td>
                   <td className="text-muted text-sm">{p.nationalite || '—'}</td>
                   <td className="text-muted text-sm">{formatBirth(p)}</td>
+                  <td className="text-muted text-sm">{formatAge(p.date_naissance, showDeath ? p.date_deces : null)}</td>
                   {showDeath && <td className="text-muted text-sm">{formatDate(p.date_deces)}</td>}
                   <td className="text-muted text-sm">{p.proposed_by || '—'}</td>
                   <td>

@@ -8,7 +8,22 @@ function formatBirth(p) {
     const [y, m, d] = p.date_naissance.split('-')
     return `${d}/${m}/${y}`
   }
-  return p.annee_naissance || '—'
+  return '—'
+}
+
+function calculateAge(dateNaissance) {
+  if (!dateNaissance) return null
+  const birth = new Date(dateNaissance)
+  const today = new Date()
+  let age = today.getFullYear() - birth.getFullYear()
+  const monthDiff = today.getMonth() - birth.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) age--
+  return age
+}
+
+function formatAge(dateNaissance) {
+  const age = calculateAge(dateNaissance)
+  return age === null ? '—' : `${age} ans`
 }
 
 export default function Selection() {
@@ -115,6 +130,7 @@ export default function Selection() {
                     <th>Catégorie</th>
                     <th>Nationalité</th>
                     <th>Naissance</th>
+                    <th>Âge</th>
                     <th>Statut</th>
                     <th style={{ width: 50 }}></th>
                   </tr>
@@ -126,6 +142,7 @@ export default function Selection() {
                       <td><span className="badge badge-cat">{p.categorie || '—'}</span></td>
                       <td className="text-muted text-sm">{p.nationalite || '—'}</td>
                       <td className="text-muted text-sm">{formatBirth(p)}</td>
+                      <td className="text-muted text-sm">{formatAge(p.date_naissance)}</td>
                       <td>
                         {p.deja_decede && (
                           <span className="badge badge-deceased">
@@ -206,6 +223,7 @@ export default function Selection() {
                         <th>Catégorie</th>
                         <th>Nationalité</th>
                         <th>Naissance</th>
+                        <th>Âge</th>
                         <th style={{ width: 140 }}></th>
                       </tr>
                     </thead>
@@ -218,6 +236,7 @@ export default function Selection() {
                             <td><span className="badge badge-cat">{r.categorie || '—'}</span></td>
                             <td className="text-muted text-sm">{r.nationalite || '—'}</td>
                             <td className="text-muted text-sm">{formatBirth(r)}</td>
+                            <td className="text-muted text-sm">{formatAge(r.date_naissance)}</td>
                             <td>
                               {r.deja_decede ? (
                                 <span className="badge badge-deceased">⚠️ Décédée</span>

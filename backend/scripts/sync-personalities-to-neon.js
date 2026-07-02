@@ -35,7 +35,7 @@ const neon = new Pool({ connectionString: NEON_DATABASE_URL, ssl: sslFor(NEON_DA
 
 async function syncAlivePersons() {
   const { rows } = await local.query(
-    `SELECT nom, prenom, categorie, nationalite, date_naissance, annee_naissance, a_verifier
+    `SELECT nom, prenom, categorie, nationalite, date_naissance, a_verifier
      FROM "alivePerson" WHERE statut = 'validee'`
   )
 
@@ -50,9 +50,9 @@ async function syncAlivePersons() {
 
     if (APPLY) {
       await neon.query(
-        `INSERT INTO "alivePerson" (nom, prenom, categorie, nationalite, date_naissance, annee_naissance, a_verifier, statut)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'validee')`,
-        [p.nom, p.prenom, p.categorie, p.nationalite, p.date_naissance, p.annee_naissance, p.a_verifier]
+        `INSERT INTO "alivePerson" (nom, prenom, categorie, nationalite, date_naissance, a_verifier, statut)
+         VALUES ($1, $2, $3, $4, $5, $6, 'validee')`,
+        [p.nom, p.prenom, p.categorie, p.nationalite, p.date_naissance, p.a_verifier]
       )
     }
     inserted++
