@@ -1,13 +1,15 @@
-# Déploiement (backend + DB) — Render + Neon
+# Déploiement — Render + Neon + Vercel
 
-Ce document couvre le déploiement du backend (`backend/`) sur Render et de la
-base PostgreSQL sur Neon. Le frontend n'est pas couvert ici (hors périmètre de
-cette configuration).
+Backend + API sur Render, base PostgreSQL sur Neon, frontend statique sur
+Vercel. Le code est prêt côté repo (`render.yaml`, `frontend/vercel.json`,
+SSL automatique pour les hôtes distants, `VITE_API_URL` configurable). Les
+étapes ci-dessous nécessitent un compte Render, un compte Neon et un compte
+Vercel — je ne peux pas les créer à ta place, voici donc le déroulé exact à
+suivre.
 
-Le code est prêt côté repo (`render.yaml`, SSL automatique pour les hôtes
-distants dans `backend/src/db/index.js`). Les étapes ci-dessous nécessitent
-un compte Render et un compte Neon — je ne peux pas les créer à ta place,
-voici donc le déroulé exact à suivre.
+Ordre important : backend d'abord (il faut son URL pour configurer le
+frontend), puis frontend, puis un dernier aller-retour pour donner l'URL du
+frontend au backend (CORS).
 
 ## 1. Créer la base sur Neon
 
@@ -31,31 +33,55 @@ voici donc le déroulé exact à suivre.
    variables à renseigner manuellement dans les paramètres du service une
    fois créé (Environment) :
    - `DATABASE_URL` : la connection string Neon récupérée à l'étape 1.
-   - `CORS_ORIGIN` : l'URL du frontend qui appellera cette API (ex.
-     `https://mon-frontend.vercel.app`). Si le frontend n'est pas encore
-     déployé, mets une valeur temporaire et reviens la modifier ensuite —
-     sans ça, le navigateur bloquera les appels API en CORS.
-5. Lance le déploiement. Render construit et démarre le service ; au premier
-   démarrage, `initDB()`/`seed()` s'exécutent normalement comme en local et
-   créent les tables + comptes de démo sur la base Neon.
+   - `CORS_ORIGIN` : laisse une valeur temporaire pour l'instant (ex.
+     `http://localhost:5173`), on la corrigera à l'étape 4 avec l'URL Vercel
+     réelle.
+5. Lance le déploiement, puis note l'URL du service une fois généré (ex.
+   `https://deathchallenge-backend.onrender.com`).
 
-## 3. Vérifier
+## 3. Déployer le frontend sur Vercel
+
+1. Crée un compte sur [vercel.com](https://vercel.com).
+2. "Add New Project", sélectionne ce dépôt.
+3. Configure le projet :
+   - **Root Directory** : `frontend`
+   - Framework : Vercel détecte Vite automatiquement (build `npm run build`,
+     dossier de sortie `dist`) — rien à changer normalement.
+4. Ajoute la variable d'environnement `VITE_API_URL` = URL du backend Render
+   suivie de `/api`, par exemple :
+   `https://deathchallenge-backend.onrender.com/api`
+5. Déploie. `frontend/vercel.json` gère déjà le fallback SPA nécessaire pour
+   react-router (sans ça, actualiser une page comme `/selection` renverrait
+   une 404).
+6. Note l'URL Vercel générée (ex. `https://deathchallenge.vercel.app`).
+
+## 4. Boucler : autoriser le frontend côté backend (CORS)
+
+Retourne dans les paramètres du service Render (Environment) et mets à jour
+`CORS_ORIGIN` avec l'URL Vercel exacte de l'étape 3 (sans slash final).
+Sauvegarder redéploie automatiquement le service.
+
+## 5. Vérifier
 
 - `https://<ton-service>.onrender.com/api/health` doit répondre `{"status":"ok"}`.
-- Se connecter via `POST /api/auth/login` avec `admin`/`admin123` doit
-  fonctionner (mêmes comptes de démo qu'en local, créés par le seed).
+- Ouvrir l'URL Vercel, se connecter avec `admin`/`admin123` (comptes de démo
+  créés automatiquement par le seed au premier démarrage du backend) : la
+  page doit charger sans erreur CORS dans la console.
 
-## Limites du plan gratuit à connaître
+## Limites des plans gratuits à connaître
 
-- Le service Render gratuit s'éteint après 15 minutes d'inactivité ; la
-  requête suivante déclenche un redémarrage à froid de 30 à 60 secondes.
-- 750h d'instance gratuites par mois (largement suffisant pour un seul
-  service qui tourne en continu, sauf usage multi-projets sur le même compte).
-- Neon gratuit : 1 projet, ~3 Gio de données — largement suffisant pour ce
-  projet (moins de 500 lignes de données actuellement).
+- **Render** : le service s'éteint après 15 minutes d'inactivité (la requête
+  suivante déclenche un redémarrage à froid de 30 à 60 secondes) ; 750h
+  d'instance gratuites par mois.
+- **Neon** : 1 projet, ~3 Gio de données — largement suffisant ici (moins de
+  500 lignes de données actuellement).
+- **Vercel** : offre gratuite généreuse pour un projet perso (limite de
+  bande passante mensuelle, pas de tâches de fond nécessaires ici puisque
+  c'est un site statique).
 
 ## Pour revenir en local
 
 Rien ne change : `docker compose up -d` + `backend/.env` avec l'URL locale
-continuent de fonctionner normalement, la bascule SSL est automatique selon
-l'hôte détecté dans `DATABASE_URL`.
+continuent de fonctionner normalement (bascule SSL automatique selon l'hôte
+détecté), et le frontend sans `VITE_API_URL` définie retombe sur le proxy
+Vite `/api` comme avant.

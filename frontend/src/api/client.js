@@ -1,6 +1,10 @@
 import axios from 'axios'
 
-const api = axios.create({ baseURL: '/api' })
+// En dev, le proxy Vite (vite.config.js) redirige /api vers le backend local,
+// donc le chemin relatif suffit. En prod, frontend et backend sont sur des
+// domaines différents (ex. Vercel + Render) : VITE_API_URL doit pointer vers
+// l'URL complète du backend déployé.
+const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || '/api' })
 
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('dc_token')
