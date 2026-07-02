@@ -4,8 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 
 const DEMO_USERS = [
   { username: 'admin',  password: 'admin123',  label: 'Administrateur', badge: 'badge-admin'  },
-  { username: 'editor', password: 'editor123', label: 'Éditeur',        badge: 'badge-editor' },
-  { username: 'viewer', password: 'viewer123', label: 'Lecteur',        badge: 'badge-viewer' },
+  { username: 'joueur', password: 'joueur123', label: 'Joueur',         badge: 'badge-joueur' },
 ]
 
 export default function Login() {
@@ -21,7 +20,7 @@ export default function Login() {
     setLoading(true)
     try {
       await login(form.username, form.password)
-      navigate('/users')
+      navigate('/')
     } catch (err) {
       setError(err.response?.data?.error || 'Erreur de connexion')
     } finally {

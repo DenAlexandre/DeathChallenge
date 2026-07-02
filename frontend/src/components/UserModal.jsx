@@ -4,13 +4,13 @@ import api from '../api/client'
 export default function UserModal({ user, onClose, onSaved }) {
   const isEdit = !!user?.id
 
-  const [form, setForm] = useState({ username: '', email: '', password: '', role: 'viewer' })
+  const [form, setForm] = useState({ username: '', email: '', password: '', role: 'joueur' })
   const [error,  setError]  = useState('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (user) {
-      setForm({ username: user.username || '', email: user.email || '', password: '', role: user.role || 'viewer' })
+      setForm({ username: user.username || '', email: user.email || '', password: '', role: user.role || 'joueur' })
     }
   }, [user])
 
@@ -76,8 +76,7 @@ export default function UserModal({ user, onClose, onSaved }) {
                 <label>Rôle *</label>
                 <select className="form-select" value={form.role}
                   onChange={e => set('role', e.target.value)}>
-                  <option value="viewer">Lecteur — consultation uniquement</option>
-                  <option value="editor">Éditeur — ajout et modification</option>
+                  <option value="joueur">Joueur</option>
                   <option value="admin">Administrateur — accès complet</option>
                 </select>
               </div>

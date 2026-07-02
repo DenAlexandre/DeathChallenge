@@ -3,12 +3,11 @@ import api from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import UserModal from '../components/UserModal'
 
-const ROLE_LABELS = { admin: 'Administrateur', editor: 'Éditeur', viewer: 'Lecteur' }
-const ROLE_BADGES = { admin: 'badge-admin', editor: 'badge-editor', viewer: 'badge-viewer' }
+const ROLE_LABELS = { admin: 'Administrateur', joueur: 'Joueur' }
+const ROLE_BADGES = { admin: 'badge-admin', joueur: 'badge-joueur' }
 
 export default function Users() {
   const { user: me } = useAuth()
-  const isAdmin = me?.role === 'admin'
 
   const [users,        setUsers]        = useState([])
   const [loading,      setLoading]      = useState(true)
@@ -42,13 +41,11 @@ export default function Users() {
       <div className="page-header">
         <div>
           <div className="page-title">Gestion des utilisateurs</div>
-          <div className="page-subtitle">Administrateurs, éditeurs et lecteurs</div>
+          <div className="page-subtitle">Administrateurs et joueurs</div>
         </div>
-        {isAdmin && (
-          <button className="btn btn-primary" onClick={() => setModal({ user: null })}>
-            + Ajouter un utilisateur
-          </button>
-        )}
+        <button className="btn btn-primary" onClick={() => setModal({ user: null })}>
+          + Ajouter un utilisateur
+        </button>
       </div>
 
       <div className="page-body">
@@ -64,7 +61,7 @@ export default function Users() {
                     <th>Email</th>
                     <th>Rôle</th>
                     <th>Créé le</th>
-                    {isAdmin && <th style={{ width: 90 }}></th>}
+                    <th style={{ width: 90 }}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -88,25 +85,23 @@ export default function Users() {
                       <td className="text-muted text-sm">
                         {new Date(u.created_at).toLocaleDateString('fr-FR')}
                       </td>
-                      {isAdmin && (
-                        <td>
-                          <div style={{ display: 'flex', gap: 4 }}>
+                      <td>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => setModal({ user: u })}
+                            title="Modifier"
+                          >✏️</button>
+                          {u.id !== me?.id && (
                             <button
                               className="btn btn-ghost btn-sm"
-                              onClick={() => setModal({ user: u })}
-                              title="Modifier"
-                            >✏️</button>
-                            {u.id !== me?.id && (
-                              <button
-                                className="btn btn-ghost btn-sm"
-                                onClick={() => setDeleteTarget(u)}
-                                title="Supprimer"
-                                style={{ color: '#dc2626' }}
-                              >🗑️</button>
-                            )}
-                          </div>
-                        </td>
-                      )}
+                              onClick={() => setDeleteTarget(u)}
+                              title="Supprimer"
+                              style={{ color: '#dc2626' }}
+                            >🗑️</button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

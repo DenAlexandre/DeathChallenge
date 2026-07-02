@@ -5,7 +5,7 @@ const { authenticate, requireRole } = require('../middleware/auth')
 
 const router = express.Router()
 
-router.get('/', authenticate, async (req, res) => {
+router.get('/', authenticate, requireRole('admin'), async (req, res) => {
   const { rows } = await db.query(
     'SELECT id, username, email, role, created_at FROM users ORDER BY created_at'
   )
@@ -17,7 +17,7 @@ router.post('/', authenticate, requireRole('admin'), async (req, res) => {
   if (!username?.trim() || !password) {
     return res.status(400).json({ error: 'Identifiant et mot de passe requis' })
   }
-  if (!['admin', 'editor', 'viewer'].includes(role)) {
+  if (!['admin', 'joueur'].includes(role)) {
     return res.status(400).json({ error: 'Rôle invalide' })
   }
   try {

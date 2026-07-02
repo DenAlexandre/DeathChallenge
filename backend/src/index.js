@@ -11,9 +11,11 @@ const app = express()
 app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173', credentials: true }))
 app.use(express.json())
 
-app.use('/api/auth',    require('./routes/auth'))
-app.use('/api/users',   require('./routes/users'))
-app.get('/api/health',  (req, res) => res.json({ status: 'ok' }))
+app.use('/api/auth',          require('./routes/auth'))
+app.use('/api/users',         require('./routes/users'))
+app.use('/api/alive-persons', require('./routes/alivePersons'))
+app.use('/api/selections',    require('./routes/selections'))
+app.get('/api/health',        (req, res) => res.json({ status: 'ok' }))
 
 app.use((err, req, res, next) => {
   console.error(err)
@@ -40,11 +42,32 @@ async function initDB() {
       username      VARCHAR(50)  UNIQUE NOT NULL,
       email         VARCHAR(100),
       password_hash VARCHAR(255) NOT NULL,
-      role          VARCHAR(20)  NOT NULL DEFAULT 'viewer'
-                    CHECK (role IN ('admin', 'editor', 'viewer')),
+      role          VARCHAR(20)  NOT NULL DEFAULT 'joueur'
+                    CHECK (role IN ('admin', 'joueur')),
       created_at    TIMESTAMPTZ  DEFAULT NOW()
     )
   `)
+
+  // Migration pour les bases existantes créées avec l'ancien modèle à 3 rôles.
+  // Le DROP doit précéder l'UPDATE : tant que l'ancienne contrainte (admin/editor/viewer)
+  // est active, une ligne passée à 'joueur' la violerait.
+  await db.query(`ALTER TABLE users ALTER COLUMN role SET DEFAULT 'joueur'`)
+  await db.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check`)
+  await db.query(`UPDATE users SET role = 'joueur' WHERE role IN ('editor', 'viewer')`)
+  await db.query(`ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin', 'joueur'))`)
+
+  // La migration ci-dessus convertit les rôles des comptes existants (editor/viewer
+  // -> joueur) mais ne crée jamais de compte nommé littéralement "joueur" sur une
+  // base qui avait déjà des utilisateurs (seed() ne s'exécute que sur table vide).
+  // On le garantit ici indépendamment, pour que le raccourci de connexion "Joueur"
+  // de l'écran de login fonctionne toujours.
+  const joueurHash = await bcrypt.hash('joueur123', 10)
+  await db.query(
+    `INSERT INTO users (username, email, password_hash, role)
+     VALUES ('joueur', 'joueur@local', $1, 'joueur')
+     ON CONFLICT (username) DO NOTHING`,
+    [joueurHash]
+  )
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS "deathPerson" (
@@ -70,6 +93,29 @@ async function initDB() {
       a_verifier      TEXT
     )
   `)
+
+  await db.query(`ALTER TABLE "alivePerson" ADD COLUMN IF NOT EXISTS statut VARCHAR(20) DEFAULT 'validee'`)
+  await db.query(`
+    ALTER TABLE "alivePerson" ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL
+  `)
+  await db.query(`
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'aliveperson_statut_check') THEN
+        ALTER TABLE "alivePerson"
+          ADD CONSTRAINT aliveperson_statut_check CHECK (statut IN ('en_attente', 'validee'));
+      END IF;
+    END $$
+  `)
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS "playerSelection" (
+      id              SERIAL PRIMARY KEY,
+      user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      alive_person_id INTEGER NOT NULL REFERENCES "alivePerson"(id) ON DELETE CASCADE,
+      created_at      TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(user_id, alive_person_id)
+    )
+  `)
 }
 
 async function seed() {
@@ -78,8 +124,7 @@ async function seed() {
 
   const defaults = [
     { username: 'admin',  email: 'admin@local',  password: 'admin123',  role: 'admin'  },
-    { username: 'editor', email: 'editor@local', password: 'editor123', role: 'editor' },
-    { username: 'viewer', email: 'viewer@local', password: 'viewer123', role: 'viewer' },
+    { username: 'joueur', email: 'joueur@local', password: 'joueur123', role: 'joueur' },
   ]
   for (const u of defaults) {
     const hash = await bcrypt.hash(u.password, 10)
@@ -88,7 +133,7 @@ async function seed() {
       [u.username, u.email, hash, u.role]
     )
   }
-  console.log('Comptes par défaut créés : admin/admin123  editor/editor123  viewer/viewer123')
+  console.log('Comptes par défaut créés : admin/admin123  joueur/joueur123')
 }
 
 function parseCsvLine(line) {

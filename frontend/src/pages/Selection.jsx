@@ -1,0 +1,222 @@
+import { useState, useEffect, useRef } from 'react'
+import api from '../api/client'
+import CreatePersonModal from '../components/CreatePersonModal'
+
+const MAX_SELECTION = 10
+
+export default function Selection() {
+  const [mySelection, setMySelection] = useState([])
+  const [loading,      setLoading]    = useState(true)
+  const [query,        setQuery]      = useState('')
+  const [results,      setResults]    = useState([])
+  const [deathMatches, setDeathMatches] = useState([])
+  const [searching,    setSearching]  = useState(false)
+  const [addError,     setAddError]   = useState('')
+  const [showCreate,   setShowCreate] = useState(false)
+  const debounceRef = useRef(null)
+
+  const loadSelection = () => {
+    setLoading(true)
+    return api.get('/selections').then(({ data }) => setMySelection(data)).finally(() => setLoading(false))
+  }
+
+  useEffect(() => { loadSelection() }, [])
+
+  useEffect(() => {
+    clearTimeout(debounceRef.current)
+    if (query.trim().length < 2) {
+      setResults([])
+      setDeathMatches([])
+      return
+    }
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true)
+      try {
+        const { data } = await api.get('/alive-persons', { params: { q: query.trim() } })
+        setResults(data.results)
+        setDeathMatches(data.deathMatches)
+      } finally {
+        setSearching(false)
+      }
+    }, 350)
+    return () => clearTimeout(debounceRef.current)
+  }, [query])
+
+  const isFull = mySelection.length >= MAX_SELECTION
+  const selectedIds = new Set(mySelection.map(s => s.alive_person_id))
+
+  const handleAdd = async (alivePersonId) => {
+    setAddError('')
+    try {
+      await api.post('/selections', { alivePersonId })
+      await loadSelection()
+    } catch (err) {
+      setAddError(err.response?.data?.error || "Erreur lors de l'ajout")
+    }
+  }
+
+  const handleRemove = async (selectionId) => {
+    await api.delete(`/selections/${selectionId}`)
+    setMySelection(s => s.filter(x => x.id !== selectionId))
+  }
+
+  const [queryNom, queryPrenom] = (() => {
+    const parts = query.trim().split(/\s+/)
+    if (parts.length < 2) return [parts[0] || '', '']
+    return [parts[parts.length - 1], parts.slice(0, -1).join(' ')]
+  })()
+
+  return (
+    <>
+      <div className="page-header">
+        <div>
+          <div className="page-title">Ma sélection</div>
+          <div className="page-subtitle">{mySelection.length}/{MAX_SELECTION} personnalités choisies</div>
+        </div>
+      </div>
+
+      <div className="page-body">
+        <div className="card" style={{ marginBottom: 20 }}>
+          {loading ? (
+            <div className="loading"><div className="spinner" /> Chargement...</div>
+          ) : mySelection.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-title">Aucune personnalité sélectionnée</div>
+              <div className="empty-text">Recherchez une personnalité vivante ci-dessous pour commencer.</div>
+            </div>
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nom</th>
+                    <th>Catégorie</th>
+                    <th>Nationalité</th>
+                    <th>Naissance</th>
+                    <th>Statut</th>
+                    <th style={{ width: 50 }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mySelection.map(p => (
+                    <tr key={p.id}>
+                      <td className="fw-600">{p.prenom} {p.nom}</td>
+                      <td><span className="badge badge-cat">{p.categorie || '—'}</span></td>
+                      <td className="text-muted text-sm">{p.nationalite || '—'}</td>
+                      <td className="text-muted text-sm">{p.annee_naissance || '—'}</td>
+                      <td>
+                        {p.deja_decede && <span className="badge badge-deceased">⚠️ Décédée</span>}
+                        {!p.deja_decede && p.statut === 'en_attente' && (
+                          <span className="badge badge-en-attente">En attente de validation</span>
+                        )}
+                        {!p.deja_decede && p.statut === 'validee' && (
+                          <span className="badge badge-alive">Vivante</span>
+                        )}
+                      </td>
+                      <td>
+                        <button className="btn btn-ghost btn-sm" title="Retirer"
+                          style={{ color: '#dc2626' }}
+                          onClick={() => handleRemove(p.id)}>🗑️</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {!isFull && (
+          <div className="card">
+            <div style={{ padding: '16px 20px 0' }}>
+              <div className="form-group">
+                <label>Rechercher une personnalité (nom ou prénom)</label>
+                <input
+                  className="form-input"
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  placeholder="Ex. Nathalie Baye"
+                  autoFocus
+                />
+              </div>
+              {addError && <div className="login-error" style={{ marginBottom: 12 }}>{addError}</div>}
+            </div>
+
+            <div style={{ padding: '0 20px 20px' }}>
+              {searching && <div className="loading"><div className="spinner" /> Recherche...</div>}
+
+              {!searching && query.trim().length >= 2 && results.length === 0 && (
+                <div className="empty-state" style={{ padding: '24px 0' }}>
+                  {deathMatches.length > 0 ? (
+                    <div className="login-error">
+                      ⚠️ {deathMatches.map(d => `${d.prenom} ${d.nom}`).join(', ')} : déjà décédé(e),
+                      impossible de sélectionner cette personne.
+                    </div>
+                  ) : (
+                    <>
+                      <div className="empty-text" style={{ marginBottom: 12 }}>
+                        Aucun résultat pour « {query} ».
+                      </div>
+                      <button className="btn btn-secondary btn-sm" onClick={() => setShowCreate(true)}>
+                        + Créer cette personne
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {!searching && results.length > 0 && (
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Nom</th>
+                        <th>Catégorie</th>
+                        <th>Nationalité</th>
+                        <th>Naissance</th>
+                        <th style={{ width: 140 }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {results.map(r => {
+                        const alreadySelected = selectedIds.has(r.id)
+                        return (
+                          <tr key={r.id}>
+                            <td className="fw-600">{r.prenom} {r.nom}</td>
+                            <td><span className="badge badge-cat">{r.categorie || '—'}</span></td>
+                            <td className="text-muted text-sm">{r.nationalite || '—'}</td>
+                            <td className="text-muted text-sm">{r.annee_naissance || '—'}</td>
+                            <td>
+                              {r.deja_decede ? (
+                                <span className="badge badge-deceased">⚠️ Décédée</span>
+                              ) : alreadySelected ? (
+                                <span className="text-muted text-sm">Déjà dans la liste</span>
+                              ) : (
+                                <button className="btn btn-primary btn-sm" onClick={() => handleAdd(r.id)}>
+                                  + Ajouter
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {showCreate && (
+        <CreatePersonModal
+          initialNom={queryNom}
+          initialPrenom={queryPrenom}
+          onClose={() => setShowCreate(false)}
+          onCreated={loadSelection}
+        />
+      )}
+    </>
+  )
+}
