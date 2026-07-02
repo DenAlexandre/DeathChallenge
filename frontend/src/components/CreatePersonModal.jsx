@@ -1,19 +1,7 @@
 import { useState } from 'react'
 import api from '../api/client'
-
-const CATEGORIES_SUGGESTIONS = [
-  'Acteur/Actrice', 'Chanteur/Chanteuse', 'Musicien/Musicienne', 'Écrivain/Écrivaine',
-  'Footballeur/Footballeuse', 'Homme/Femme politique', 'Basketteur/Basketteuse',
-  'Réalisateur/Réalisatrice', 'Humoriste', 'Danseur/Danseuse', 'Scientifique',
-  'Journaliste', 'Peintre/Sculpteur', 'Rugbyman/Rugbywoman', 'Cycliste',
-]
-
-const NATIONALITES = [
-  'Allemand(e)', 'Américain(e)', 'Anglais(e)', 'Argentin(e)', 'Autrichien(ne)',
-  'Belge', 'Canadien(ne)', 'Espagnol(e)', 'Français(e)', 'Grec(que)', 'Indien(ne)',
-  'Irlandais(e)', 'Italien(ne)', 'Japonais(e)', 'Néerlandais(e)', 'Polonais(e)',
-  'Portugais(e)', 'Russe', 'Sénégalais(e)', 'Sud-Africain(e)', 'Suisse', 'Turc(que)',
-]
+import { CATEGORIES_SUGGESTIONS, NATIONALITES } from '../lib/personOptions'
+import { today } from '../lib/format'
 
 export default function CreatePersonModal({ initialNom, initialPrenom, validationRequired = true, onClose, onCreated }) {
   const [statutVital, setStatutVital] = useState('vivante') // 'vivante' | 'decedee'
@@ -47,24 +35,16 @@ export default function CreatePersonModal({ initialNom, initialPrenom, validatio
     setError('')
     setSaving(true)
     try {
-      if (isDecedee) {
-        await api.post('/death-persons', {
-          nom: form.nom,
-          prenom: form.prenom,
-          categorie: form.categorie,
-          nationalite: form.nationalite,
-          date_naissance: form.date_naissance || null,
-          date_deces: form.date_deces,
-        })
-      } else {
-        const { data: created } = await api.post('/alive-persons', {
-          nom: form.nom,
-          prenom: form.prenom,
-          categorie: form.categorie,
-          nationalite: form.nationalite,
-          date_naissance: form.date_naissance,
-        })
-        await api.post('/selections', { alivePersonId: created.id })
+      const { data: created } = await api.post('/personnalites', {
+        nom: form.nom,
+        prenom: form.prenom,
+        categorie: form.categorie,
+        nationalite: form.nationalite,
+        date_naissance: form.date_naissance || null,
+        date_deces: isDecedee ? form.date_deces : null,
+      })
+      if (!isDecedee) {
+        await api.post('/selections', { personId: created.id })
       }
       onCreated()
       onClose()
@@ -150,14 +130,14 @@ export default function CreatePersonModal({ initialNom, initialPrenom, validatio
                 <label>Date de naissance{isDecedee ? '' : ' *'}</label>
                 <input className="form-input" type="date" value={form.date_naissance}
                   onChange={e => set('date_naissance', e.target.value)}
-                  min="1900-01-01" max="2026-07-02" required={!isDecedee} />
+                  min="1900-01-01" max={today()} required={!isDecedee} />
               </div>
               {isDecedee && (
                 <div className="form-group">
                   <label>Date de décès *</label>
                   <input className="form-input" type="date" value={form.date_deces}
                     onChange={e => set('date_deces', e.target.value)}
-                    min="1900-01-01" max="2026-07-02" required />
+                    min="1900-01-01" max={today()} required />
                 </div>
               )}
             </div>

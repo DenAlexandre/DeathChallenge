@@ -10,32 +10,26 @@ function calculateAge(dateNaissance, dateDeces) {
   return age
 }
 
-// Applique les conséquences d'un décès considéré comme acquis (validé par un admin, ou
-// immédiat si la règle "validation_admin" est désactivée) : attribue les points (si la
-// règle "points_calcul" est active) aux joueurs ayant la personne en sélection, puis
-// retire la ligne alivePerson (ou la marque "decedee" si un joueur l'a en sélection, pour
-// ne pas perdre — via la cascade FK — son historique de pari).
-async function applyDeathToAlivePerson(alivePersonId, dateDeces, pointsRuleActive) {
-  const { rows: personRows } = await db.query(
-    `SELECT date_naissance FROM "alivePerson" WHERE id = $1`,
-    [alivePersonId]
+// Applique un décès considéré comme acquis (validé par un admin, ou immédiat si
+// la règle "validation_admin" est désactivée) : renseigne date_deces (qui fait
+// foi), efface tout signalement en attente, et attribue les points (si la règle
+// "points_calcul" est active) aux joueurs ayant la personne en sélection.
+async function applyDeath(personId, dateDeces, pointsRuleActive) {
+  const { rows } = await db.query(
+    `UPDATE "personnalite"
+     SET date_deces = $1, date_deces_proposee = NULL, deces_signale_par = NULL
+     WHERE id = $2
+     RETURNING date_naissance`,
+    [dateDeces, personId]
   )
-  const { rows: selectionRows } = await db.query(
-    `SELECT 1 FROM "playerSelection" WHERE alive_person_id = $1 LIMIT 1`,
-    [alivePersonId]
-  )
+  if (!rows[0]) return false
 
-  if (pointsRuleActive && selectionRows[0] && personRows[0]) {
-    const age = calculateAge(personRows[0].date_naissance, dateDeces)
+  if (pointsRuleActive) {
+    const age = calculateAge(rows[0].date_naissance, dateDeces)
     const points = age === null ? 0 : Math.max(0, 100 - age)
-    await db.query(`UPDATE "playerSelection" SET points = $1 WHERE alive_person_id = $2`, [points, alivePersonId])
+    await db.query(`UPDATE "playerSelection" SET points = $1 WHERE person_id = $2`, [points, personId])
   }
-
-  if (selectionRows[0]) {
-    await db.query(`UPDATE "alivePerson" SET statut = 'decedee' WHERE id = $1`, [alivePersonId])
-  } else {
-    await db.query(`DELETE FROM "alivePerson" WHERE id = $1`, [alivePersonId])
-  }
+  return true
 }
 
-module.exports = { calculateAge, applyDeathToAlivePerson }
+module.exports = { calculateAge, applyDeath }

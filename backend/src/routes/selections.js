@@ -7,15 +7,11 @@ const router = express.Router()
 
 router.get('/', authenticate, async (req, res) => {
   const { rows } = await db.query(
-    `SELECT s.id, s.points, ap.id AS alive_person_id, ap.nom, ap.prenom, ap.categorie,
-            ap.date_naissance, ap.nationalite, ap.statut,
-            EXISTS (
-              SELECT 1 FROM "deathPerson" dp
-              WHERE dp.statut = 'validee'
-                AND lower(dp.nom) = lower(ap.nom) AND lower(dp.prenom) = lower(ap.prenom)
-            ) AS deja_decede
+    `SELECT s.id, s.points, p.id AS person_id, p.nom, p.prenom, p.categorie,
+            p.date_naissance, p.nationalite, p.statut,
+            (p.date_deces IS NOT NULL) AS deja_decede
      FROM "playerSelection" s
-     JOIN "alivePerson" ap ON ap.id = s.alive_person_id
+     JOIN "personnalite" p ON p.id = s.person_id
      WHERE s.user_id = $1
      ORDER BY s.created_at`,
     [req.user.id]
@@ -24,8 +20,8 @@ router.get('/', authenticate, async (req, res) => {
 })
 
 router.post('/', authenticate, async (req, res) => {
-  const { alivePersonId } = req.body
-  if (!alivePersonId) return res.status(400).json({ error: 'alivePersonId requis' })
+  const { personId } = req.body
+  if (!personId) return res.status(400).json({ error: 'personId requis' })
 
   const limiteRegle = await getRegle('limite_selection')
   if (limiteRegle?.active !== false) {
@@ -39,22 +35,17 @@ router.post('/', authenticate, async (req, res) => {
     }
   }
 
-  const { rows: personRows } = await db.query('SELECT nom, prenom FROM "alivePerson" WHERE id = $1', [alivePersonId])
+  const { rows: personRows } = await db.query('SELECT date_deces FROM "personnalite" WHERE id = $1', [personId])
   const person = personRows[0]
   if (!person) return res.status(404).json({ error: 'Personne non trouvée' })
-
-  const { rows: deathRows } = await db.query(
-    `SELECT 1 FROM "deathPerson" WHERE statut = 'validee' AND lower(nom) = lower($1) AND lower(prenom) = lower($2)`,
-    [person.nom, person.prenom]
-  )
-  if (deathRows[0]) {
+  if (person.date_deces) {
     return res.status(400).json({ error: 'Cette personne est déjà décédée, sélection refusée' })
   }
 
   try {
     const { rows } = await db.query(
-      `INSERT INTO "playerSelection" (user_id, alive_person_id) VALUES ($1, $2) RETURNING id`,
-      [req.user.id, alivePersonId]
+      `INSERT INTO "playerSelection" (user_id, person_id) VALUES ($1, $2) RETURNING id`,
+      [req.user.id, personId]
     )
     res.status(201).json(rows[0])
   } catch (err) {

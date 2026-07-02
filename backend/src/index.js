@@ -1,4 +1,7 @@
 require('dotenv').config()
+// Express 4 ne transmet pas les rejets des handlers async au middleware d'erreur :
+// sans ce patch, toute erreur DB dans une route async ferait crasher le process.
+require('express-async-errors')
 const fs = require('fs')
 const path = require('path')
 const express = require('express')
@@ -13,8 +16,7 @@ app.use(express.json())
 
 app.use('/api/auth',          require('./routes/auth'))
 app.use('/api/users',         require('./routes/users'))
-app.use('/api/alive-persons', require('./routes/alivePersons'))
-app.use('/api/death-persons', require('./routes/deathPersons'))
+app.use('/api/personnalites', require('./routes/personnalites'))
 app.use('/api/selections',    require('./routes/selections'))
 app.use('/api/regles',        require('./routes/regles'))
 app.use('/api/person-edits',  require('./routes/personEdits'))
@@ -59,95 +61,138 @@ async function initDB() {
   await db.query(`UPDATE users SET role = 'joueur' WHERE role IN ('editor', 'viewer')`)
   await db.query(`ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin', 'joueur'))`)
 
+  // ── Table unique "personnalite" ─────────────────────────────────────────────
+  // Fusion des anciennes tables alivePerson (vivants) et deathPerson (décès) :
+  // date_deces NULL = personne vivante, renseignée = décédée (la date fait foi).
+  // Les FK existantes (playerSelection, alivePersonEdit) suivent le RENAME.
   await db.query(`
-    CREATE TABLE IF NOT EXISTS "deathPerson" (
+    DO $$ BEGIN
+      IF to_regclass('"personnalite"') IS NULL AND to_regclass('"alivePerson"') IS NOT NULL THEN
+        ALTER TABLE "alivePerson" RENAME TO "personnalite";
+      END IF;
+    END $$
+  `)
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS "personnalite" (
       id             SERIAL PRIMARY KEY,
       nom            VARCHAR(150),
       prenom         VARCHAR(150),
       categorie      VARCHAR(150),
+      nationalite    VARCHAR(100),
+      a_verifier     TEXT,
       date_naissance DATE,
       date_deces     DATE,
-      nationalite    VARCHAR(100),
-      a_verifier     TEXT
+      statut         VARCHAR(20) DEFAULT 'validee',
+      created_by     INTEGER REFERENCES users(id) ON DELETE SET NULL
     )
   `)
 
-  // Comme pour alivePerson : les joueurs peuvent signaler un décès absent de la
-  // base scrapée. La ligne reste "en_attente" (non prise en compte comme décès
-  // avéré) tant qu'un admin ne l'a pas validée.
-  await db.query(`ALTER TABLE "deathPerson" ADD COLUMN IF NOT EXISTS statut VARCHAR(20) DEFAULT 'validee'`)
+  // Colonnes manquantes sur les bases issues du RENAME.
+  await db.query(`ALTER TABLE "personnalite" ADD COLUMN IF NOT EXISTS date_naissance DATE`)
+  await db.query(`ALTER TABLE "personnalite" DROP COLUMN IF EXISTS annee_naissance`)
+  await db.query(`ALTER TABLE "personnalite" ADD COLUMN IF NOT EXISTS statut VARCHAR(20) DEFAULT 'validee'`)
   await db.query(`
-    ALTER TABLE "deathPerson" ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL
+    ALTER TABLE "personnalite" ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL
   `)
+  await db.query(`ALTER TABLE "personnalite" ADD COLUMN IF NOT EXISTS date_deces DATE`)
+  // Signalement de décès en attente de validation admin : porté par la ligne
+  // elle-même (plus besoin d'une seconde table), appliqué dans date_deces à la
+  // validation puis remis à NULL.
+  await db.query(`ALTER TABLE "personnalite" ADD COLUMN IF NOT EXISTS date_deces_proposee DATE`)
+  await db.query(`
+    ALTER TABLE "personnalite" ADD COLUMN IF NOT EXISTS deces_signale_par INTEGER REFERENCES users(id) ON DELETE SET NULL
+  `)
+
+  // Import de l'ancienne table deathPerson puis suppression (idempotent : ne
+  // s'exécute que si elle existe encore).
   await db.query(`
     DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'deathperson_statut_check') THEN
-        ALTER TABLE "deathPerson"
-          ADD CONSTRAINT deathperson_statut_check CHECK (statut IN ('en_attente', 'validee'));
+      IF to_regclass('"deathPerson"') IS NOT NULL THEN
+        -- Décès validés liés à une personne existante (signalements aboutis)
+        UPDATE "personnalite" p SET date_deces = dp.date_deces
+        FROM "deathPerson" dp
+        WHERE dp.alive_person_id = p.id AND dp.statut = 'validee' AND p.date_deces IS NULL;
+
+        -- Signalements encore en attente : reportés sur la ligne de la personne
+        UPDATE "personnalite" p SET date_deces_proposee = dp.date_deces, deces_signale_par = dp.created_by
+        FROM "deathPerson" dp
+        WHERE dp.alive_person_id = p.id AND dp.statut = 'en_attente' AND p.date_deces IS NULL;
+
+        -- Lignes marquées 'decedee' dont le lien a été perdu : rattrapage par nom
+        UPDATE "personnalite" p SET date_deces = dp.date_deces
+        FROM "deathPerson" dp
+        WHERE p.statut = 'decedee' AND p.date_deces IS NULL AND dp.statut = 'validee'
+          AND lower(p.nom) = lower(dp.nom)
+          AND lower(COALESCE(p.prenom, '')) = lower(COALESCE(dp.prenom, ''));
+
+        -- Tout le reste (décès sans ligne vivante correspondante) : nouvelles lignes
+        INSERT INTO "personnalite" (nom, prenom, categorie, nationalite, date_naissance, date_deces, a_verifier, statut, created_by)
+        SELECT dp.nom, dp.prenom, dp.categorie, dp.nationalite, dp.date_naissance, dp.date_deces, dp.a_verifier, dp.statut, dp.created_by
+        FROM "deathPerson" dp
+        WHERE dp.alive_person_id IS NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM "personnalite" p
+            WHERE lower(p.nom) = lower(dp.nom)
+              AND lower(COALESCE(p.prenom, '')) = lower(COALESCE(dp.prenom, ''))
+          );
+
+        DROP TABLE "deathPerson";
       END IF;
     END $$
   `)
-  // Renseigné quand l'entrée provient du signalement d'une personne déjà présente
-  // dans alivePerson (plutôt que d'une proposition de personnalité inédite) : permet,
-  // à la validation, de retrouver la ligne alivePerson à supprimer ou marquer décédée.
-  await db.query(`
-    ALTER TABLE "deathPerson" ADD COLUMN IF NOT EXISTS alive_person_id INTEGER REFERENCES "alivePerson"(id) ON DELETE SET NULL
-  `)
 
+  // Le statut 'decedee' n'existe plus : c'est date_deces qui fait foi.
+  await db.query(`UPDATE "personnalite" SET statut = 'validee' WHERE statut = 'decedee'`)
+  await db.query(`ALTER TABLE "personnalite" DROP CONSTRAINT IF EXISTS aliveperson_statut_check`)
+  await db.query(`ALTER TABLE "personnalite" DROP CONSTRAINT IF EXISTS personnalite_statut_check`)
   await db.query(`
-    CREATE TABLE IF NOT EXISTS "alivePerson" (
-      id              SERIAL PRIMARY KEY,
-      nom             VARCHAR(150),
-      prenom          VARCHAR(150),
-      categorie       VARCHAR(150),
-      nationalite     VARCHAR(100),
-      a_verifier      TEXT
-    )
-  `)
-
-  await db.query(`ALTER TABLE "alivePerson" ADD COLUMN IF NOT EXISTS date_naissance DATE`)
-  // Ancien repli utilisé quand la date exacte de naissance n'était pas connue
-  // (données scrapées) — retiré, date_naissance est désormais la seule source.
-  await db.query(`ALTER TABLE "alivePerson" DROP COLUMN IF EXISTS annee_naissance`)
-  await db.query(`ALTER TABLE "alivePerson" ADD COLUMN IF NOT EXISTS statut VARCHAR(20) DEFAULT 'validee'`)
-  await db.query(`
-    ALTER TABLE "alivePerson" ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL
-  `)
-  // 'decedee' : la personne a été signalée décédée et validée, mais au moins un joueur
-  // l'avait dans sa sélection — on la conserve (au lieu de la supprimer) pour ne pas
-  // perdre l'historique de son pari. DROP puis ADD (comme pour users.role) pour que les
-  // bases déjà migrées avec l'ancienne contrainte (sans 'decedee') soient mises à jour.
-  await db.query(`ALTER TABLE "alivePerson" DROP CONSTRAINT IF EXISTS aliveperson_statut_check`)
-  await db.query(`
-    ALTER TABLE "alivePerson" ADD CONSTRAINT aliveperson_statut_check CHECK (statut IN ('en_attente', 'validee', 'decedee'))
+    ALTER TABLE "personnalite" ADD CONSTRAINT personnalite_statut_check CHECK (statut IN ('en_attente', 'validee'))
   `)
 
   // File d'attente des modifications proposées par un joueur sur une personnalité
-  // déjà validée : les nouvelles valeurs ne sont appliquées à alivePerson qu'à la
-  // validation admin. La ligne est supprimée une fois traitée (validée ou rejetée) —
-  // elle ne sert qu'à porter la proposition, pas d'historique à conserver.
+  // déjà validée : les nouvelles valeurs ne sont appliquées qu'à la validation
+  // admin, puis la ligne est supprimée (pas d'historique à conserver).
   await db.query(`
-    CREATE TABLE IF NOT EXISTS "alivePersonEdit" (
-      id              SERIAL PRIMARY KEY,
-      alive_person_id INTEGER NOT NULL REFERENCES "alivePerson"(id) ON DELETE CASCADE,
-      nom             VARCHAR(150) NOT NULL,
-      prenom          VARCHAR(150) NOT NULL,
-      categorie       VARCHAR(150),
-      nationalite     VARCHAR(100),
-      date_naissance  DATE,
-      created_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
-      created_at      TIMESTAMPTZ DEFAULT NOW()
+    DO $$ BEGIN
+      IF to_regclass('"personEdit"') IS NULL AND to_regclass('"alivePersonEdit"') IS NOT NULL THEN
+        ALTER TABLE "alivePersonEdit" RENAME TO "personEdit";
+        ALTER TABLE "personEdit" RENAME COLUMN alive_person_id TO person_id;
+      END IF;
+    END $$
+  `)
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS "personEdit" (
+      id             SERIAL PRIMARY KEY,
+      person_id      INTEGER NOT NULL REFERENCES "personnalite"(id) ON DELETE CASCADE,
+      nom            VARCHAR(150) NOT NULL,
+      prenom         VARCHAR(150) NOT NULL,
+      categorie      VARCHAR(150),
+      nationalite    VARCHAR(100),
+      date_naissance DATE,
+      created_by     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at     TIMESTAMPTZ DEFAULT NOW()
     )
   `)
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS "playerSelection" (
-      id              SERIAL PRIMARY KEY,
-      user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      alive_person_id INTEGER NOT NULL REFERENCES "alivePerson"(id) ON DELETE CASCADE,
-      created_at      TIMESTAMPTZ DEFAULT NOW(),
-      UNIQUE(user_id, alive_person_id)
+      id         SERIAL PRIMARY KEY,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      person_id  INTEGER NOT NULL REFERENCES "personnalite"(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(user_id, person_id)
     )
+  `)
+  await db.query(`
+    DO $$ BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'playerSelection' AND column_name = 'alive_person_id'
+      ) THEN
+        ALTER TABLE "playerSelection" RENAME COLUMN alive_person_id TO person_id;
+      END IF;
+    END $$
   `)
   // Renseigné (100 - âge au décès, min 0) quand la personne sélectionnée décède et que
   // le décès est validé par un admin ; reste NULL tant qu'elle est vivante.
@@ -165,6 +210,13 @@ async function initDB() {
       valeur      INTEGER
     )
   `)
+
+  // Index d'expression sur lower(nom/prenom) : utilisé par toutes les
+  // vérifications de doublons (comparaisons insensibles à la casse).
+  await db.query(`DROP INDEX IF EXISTS aliveperson_nom_prenom_idx`)
+  await db.query(`CREATE INDEX IF NOT EXISTS personnalite_nom_prenom_idx ON "personnalite" (lower(nom), lower(prenom))`)
+  await db.query(`DROP INDEX IF EXISTS playerselection_alive_idx`)
+  await db.query(`CREATE INDEX IF NOT EXISTS playerselection_person_idx ON "playerSelection" (person_id)`)
 }
 
 async function seed() {
@@ -253,53 +305,34 @@ function parseCsv(content) {
   })
 }
 
-async function seedDeathPersons() {
-  const { rows } = await db.query('SELECT COUNT(*)::int AS count FROM "deathPerson"')
-  if (rows[0].count > 0) return
-
-  const csvPath = path.join(__dirname, 'data', 'deathPerson.csv')
-  const records = parseCsv(fs.readFileSync(csvPath, 'utf8'))
-
-  for (const r of records) {
-    await db.query(
-      `INSERT INTO "deathPerson" (nom, prenom, categorie, date_naissance, date_deces, nationalite, a_verifier)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [
-        r.nom || null,
-        r.prenom || null,
-        r.categorie || null,
-        r.date_naissance || null,
-        r.date_deces || null,
-        r.nationalite || null,
-        r.a_verifier || null,
-      ]
-    )
+// Seed depuis les CSV scrapés, avec un garde-fou par population (vivants /
+// décédés) : une base migrée a déjà les deux, une base fraîche importe tout.
+async function seedPersonnalites() {
+  const { rows: deadRows } = await db.query('SELECT COUNT(*)::int AS count FROM "personnalite" WHERE date_deces IS NOT NULL')
+  if (deadRows[0].count === 0) {
+    const records = parseCsv(fs.readFileSync(path.join(__dirname, 'data', 'deathPerson.csv'), 'utf8'))
+    for (const r of records) {
+      await db.query(
+        `INSERT INTO "personnalite" (nom, prenom, categorie, date_naissance, date_deces, nationalite, a_verifier)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [r.nom || null, r.prenom || null, r.categorie || null, r.date_naissance || null, r.date_deces || null, r.nationalite || null, r.a_verifier || null]
+      )
+    }
+    console.log(`${records.length} personnalités décédées importées`)
   }
-  console.log(`${records.length} personnalités décédées importées dans deathPerson`)
-}
 
-async function seedAlivePersons() {
-  const { rows } = await db.query('SELECT COUNT(*)::int AS count FROM "alivePerson"')
-  if (rows[0].count > 0) return
-
-  const csvPath = path.join(__dirname, 'data', 'alivePerson.csv')
-  const records = parseCsv(fs.readFileSync(csvPath, 'utf8'))
-
-  for (const r of records) {
-    await db.query(
-      `INSERT INTO "alivePerson" (nom, prenom, categorie, date_naissance, nationalite, a_verifier)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [
-        r.nom || null,
-        r.prenom || null,
-        r.categorie || null,
-        r.date_naissance || null,
-        r.nationalite || null,
-        r.a_verifier || null,
-      ]
-    )
+  const { rows: aliveRows } = await db.query('SELECT COUNT(*)::int AS count FROM "personnalite" WHERE date_deces IS NULL')
+  if (aliveRows[0].count === 0) {
+    const records = parseCsv(fs.readFileSync(path.join(__dirname, 'data', 'alivePerson.csv'), 'utf8'))
+    for (const r of records) {
+      await db.query(
+        `INSERT INTO "personnalite" (nom, prenom, categorie, date_naissance, nationalite, a_verifier)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [r.nom || null, r.prenom || null, r.categorie || null, r.date_naissance || null, r.nationalite || null, r.a_verifier || null]
+      )
+    }
+    console.log(`${records.length} personnalités vivantes importées`)
   }
-  console.log(`${records.length} personnalités vivantes importées dans alivePerson`)
 }
 
 const PORT = process.env.PORT || 3001
@@ -310,8 +343,7 @@ const PORT = process.env.PORT || 3001
     await initDB()
     await seed()
     await seedRegles()
-    await seedDeathPersons()
-    await seedAlivePersons()
+    await seedPersonnalites()
     app.listen(PORT, () => console.log(`Backend démarré sur http://localhost:${PORT}`))
   } catch (err) {
     console.error('Erreur au démarrage :', err.message)

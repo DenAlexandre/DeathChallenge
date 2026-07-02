@@ -1,6 +1,7 @@
 const express = require('express')
 const db = require('../db')
 const { authenticate, requireRole } = require('../middleware/auth')
+const { invalidateRegles } = require('../regles')
 
 const router = express.Router()
 
@@ -21,6 +22,7 @@ router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
     [active, valeur, req.params.id]
   )
   if (!rows[0]) return res.status(404).json({ error: 'Règle non trouvée' })
+  invalidateRegles()
   res.json(rows[0])
 })
 

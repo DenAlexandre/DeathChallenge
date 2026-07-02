@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import api from '../api/client'
+import { today } from '../lib/format'
 
 export default function ReportDeathModal({ person, validationRequired = true, onClose, onReported }) {
   const [dateDeces, setDateDeces] = useState('')
@@ -12,7 +13,7 @@ export default function ReportDeathModal({ person, validationRequired = true, on
     setError('')
     setSaving(true)
     try {
-      await api.post(`/alive-persons/${person.id}/report-death`, { date_deces: dateDeces })
+      await api.post(`/personnalites/${person.id}/report-death`, { date_deces: dateDeces })
       onReported()
       setSubmitted(true)
     } catch (err) {
@@ -58,7 +59,7 @@ export default function ReportDeathModal({ person, validationRequired = true, on
                 <label>Date de décès *</label>
                 <input className="form-input" type="date" value={dateDeces}
                   onChange={e => setDateDeces(e.target.value)}
-                  min="1900-01-01" max="2026-07-02" required autoFocus />
+                  min="1900-01-01" max={today()} required autoFocus />
               </div>
             </div>
 

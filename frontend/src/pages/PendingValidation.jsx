@@ -1,34 +1,15 @@
 import { useState, useEffect } from 'react'
 import api from '../api/client'
+import { formatDate, formatAge } from '../lib/format'
 
-function formatDate(iso) {
-  if (!iso) return '—'
-  const [y, m, d] = iso.split('-')
-  return `${d}/${m}/${y}`
-}
-
-function formatBirth(p) {
-  return formatDate(p.date_naissance)
-}
-
-function formatAge(dateNaissance, referenceDate) {
-  if (!dateNaissance) return '—'
-  const birth = new Date(dateNaissance)
-  const ref = referenceDate ? new Date(referenceDate) : new Date()
-  let age = ref.getFullYear() - birth.getFullYear()
-  const monthDiff = ref.getMonth() - birth.getMonth()
-  if (monthDiff < 0 || (monthDiff === 0 && ref.getDate() < birth.getDate())) age--
-  return `${age} ans`
-}
-
-function PendingSection({ title, subtitle, emptyText, endpoint, showDeath }) {
+function PendingSection({ title, subtitle, emptyText, pendingPath, validatePath, rejectPath, showDeath }) {
   const [pending, setPending] = useState([])
   const [loading, setLoading] = useState(true)
   const [busyId,  setBusyId]  = useState(null)
 
   const load = () => {
     setLoading(true)
-    return api.get(`${endpoint}/pending`).then(({ data }) => setPending(data)).finally(() => setLoading(false))
+    return api.get(pendingPath).then(({ data }) => setPending(data)).finally(() => setLoading(false))
   }
 
   useEffect(() => { load() }, [])
@@ -36,7 +17,7 @@ function PendingSection({ title, subtitle, emptyText, endpoint, showDeath }) {
   const handleValidate = async (id) => {
     setBusyId(id)
     try {
-      await api.put(`${endpoint}/${id}/validate`)
+      await api.put(validatePath(id))
       setPending(p => p.filter(x => x.id !== id))
     } finally {
       setBusyId(null)
@@ -46,7 +27,7 @@ function PendingSection({ title, subtitle, emptyText, endpoint, showDeath }) {
   const handleReject = async (id) => {
     setBusyId(id)
     try {
-      await api.delete(`${endpoint}/${id}`)
+      await api.delete(rejectPath(id))
       setPending(p => p.filter(x => x.id !== id))
     } finally {
       setBusyId(null)
@@ -87,7 +68,7 @@ function PendingSection({ title, subtitle, emptyText, endpoint, showDeath }) {
                   <td className="fw-600">{p.prenom} {p.nom}</td>
                   <td><span className="badge badge-cat">{p.categorie || '—'}</span></td>
                   <td className="text-muted text-sm">{p.nationalite || '—'}</td>
-                  <td className="text-muted text-sm">{formatBirth(p)}</td>
+                  <td className="text-muted text-sm">{formatDate(p.date_naissance)}</td>
                   <td className="text-muted text-sm">{formatAge(p.date_naissance, showDeath ? p.date_deces : null)}</td>
                   {showDeath && <td className="text-muted text-sm">{formatDate(p.date_deces)}</td>}
                   <td className="text-muted text-sm">{p.proposed_by || '—'}</td>
@@ -234,14 +215,18 @@ export default function PendingValidation() {
           title="Personnalités vivantes"
           subtitle="Nouvelles entrées proposées pour une sélection"
           emptyText="Aucune proposition en attente pour le moment."
-          endpoint="/alive-persons"
+          pendingPath="/personnalites/pending"
+          validatePath={id => `/personnalites/${id}/validate`}
+          rejectPath={id => `/personnalites/${id}`}
         />
         <PersonEditsSection />
         <PendingSection
           title="Décès signalés"
-          subtitle="Décès absents de la base, signalés par des joueurs"
+          subtitle="Décès signalés ou proposés par des joueurs"
           emptyText="Aucun décès en attente de vérification."
-          endpoint="/death-persons"
+          pendingPath="/personnalites/pending-deaths"
+          validatePath={id => `/personnalites/${id}/validate-death`}
+          rejectPath={id => `/personnalites/${id}/death-report`}
           showDeath
         />
       </div>

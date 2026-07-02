@@ -1,19 +1,7 @@
 import { useState } from 'react'
 import api from '../api/client'
-
-const CATEGORIES_SUGGESTIONS = [
-  'Acteur/Actrice', 'Chanteur/Chanteuse', 'Musicien/Musicienne', 'Écrivain/Écrivaine',
-  'Footballeur/Footballeuse', 'Homme/Femme politique', 'Basketteur/Basketteuse',
-  'Réalisateur/Réalisatrice', 'Humoriste', 'Danseur/Danseuse', 'Scientifique',
-  'Journaliste', 'Peintre/Sculpteur', 'Rugbyman/Rugbywoman', 'Cycliste',
-]
-
-const NATIONALITES = [
-  'Allemand(e)', 'Américain(e)', 'Anglais(e)', 'Argentin(e)', 'Autrichien(ne)',
-  'Belge', 'Canadien(ne)', 'Espagnol(e)', 'Français(e)', 'Grec(que)', 'Indien(ne)',
-  'Irlandais(e)', 'Italien(ne)', 'Japonais(e)', 'Néerlandais(e)', 'Polonais(e)',
-  'Portugais(e)', 'Russe', 'Sénégalais(e)', 'Sud-Africain(e)', 'Suisse', 'Turc(que)',
-]
+import { CATEGORIES_SUGGESTIONS, NATIONALITES } from '../lib/personOptions'
+import { today } from '../lib/format'
 
 export default function EditPersonModal({ person, validationRequired = true, onClose, onProposed }) {
   const [form, setForm] = useState({
@@ -48,7 +36,7 @@ export default function EditPersonModal({ person, validationRequired = true, onC
     setError('')
     setSaving(true)
     try {
-      const { data } = await api.post(`/alive-persons/${person.id}/propose-edit`, {
+      const { data } = await api.post(`/personnalites/${person.id}/propose-edit`, {
         nom: form.nom,
         prenom: form.prenom,
         categorie: form.categorie,
@@ -134,7 +122,7 @@ export default function EditPersonModal({ person, validationRequired = true, onC
                   <label>Date de naissance</label>
                   <input className="form-input" type="date" value={form.date_naissance}
                     onChange={e => set('date_naissance', e.target.value)}
-                    min="1900-01-01" max="2026-07-02" />
+                    min="1900-01-01" max={today()} />
                 </div>
               </div>
             </div>

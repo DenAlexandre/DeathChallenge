@@ -1,31 +1,13 @@
 import { useState, useEffect } from 'react'
 import api from '../api/client'
 import AdminPersonModal from '../components/AdminPersonModal'
+import { formatDate } from '../lib/format'
 
-function formatDate(iso) {
-  if (!iso) return '—'
-  const [y, m, d] = iso.split('-')
-  return `${d}/${m}/${y}`
-}
+const STATUT_LABELS = { validee: 'Validée', en_attente: 'En attente' }
+const STATUT_BADGES = { validee: 'badge-alive', en_attente: 'badge-en-attente' }
 
-const STATUT_LABELS = { validee: 'Validée', en_attente: 'En attente', decedee: 'Décédée' }
-const STATUT_BADGES = { validee: 'badge-alive', en_attente: 'badge-en-attente', decedee: 'badge-deceased' }
-
-function PersonTable({ title, subtitle, endpoint, type, showDeath, editTarget, setEditTarget }) {
-  const [persons, setPersons] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [query,   setQuery]   = useState('')
-
-  const load = () => {
-    setLoading(true)
-    return api.get(`${endpoint}/all`).then(({ data }) => setPersons(data)).finally(() => setLoading(false))
-  }
-
-  useEffect(() => { load() }, [])
-
-  const handleSaved = (updated) => {
-    setPersons(list => list.map(p => p.id === updated.id ? updated : p))
-  }
+function PersonTable({ title, subtitle, persons, showDeath, setEditTarget }) {
+  const [query, setQuery] = useState('')
 
   const filtered = persons.filter(p => {
     const q = query.trim().toLowerCase()
@@ -49,9 +31,7 @@ function PersonTable({ title, subtitle, endpoint, type, showDeath, editTarget, s
         />
       </div>
 
-      {loading ? (
-        <div className="loading"><div className="spinner" /> Chargement...</div>
-      ) : filtered.length === 0 ? (
+      {filtered.length === 0 ? (
         <div className="empty-state">
           <div className="empty-text">Aucun résultat.</div>
         </div>
@@ -80,7 +60,7 @@ function PersonTable({ title, subtitle, endpoint, type, showDeath, editTarget, s
                   <td><span className={`badge ${STATUT_BADGES[p.statut] || ''}`}>{STATUT_LABELS[p.statut] || p.statut}</span></td>
                   <td>
                     <button className="btn btn-ghost btn-sm" title="Modifier"
-                      onClick={() => setEditTarget({ person: p, type, onSaved: handleSaved })}>✏️</button>
+                      onClick={() => setEditTarget(p)}>✏️</button>
                   </td>
                 </tr>
               ))}
@@ -96,7 +76,23 @@ function PersonTable({ title, subtitle, endpoint, type, showDeath, editTarget, s
 }
 
 export default function Personalities() {
+  const [persons,    setPersons]    = useState([])
+  const [loading,    setLoading]    = useState(true)
   const [editTarget, setEditTarget] = useState(null)
+
+  const load = () => {
+    setLoading(true)
+    return api.get('/personnalites/all').then(({ data }) => setPersons(data)).finally(() => setLoading(false))
+  }
+
+  useEffect(() => { load() }, [])
+
+  const handleSaved = (updated) => {
+    setPersons(list => list.map(p => p.id === updated.id ? updated : p))
+  }
+
+  const alive = persons.filter(p => !p.date_deces)
+  const dead = persons.filter(p => p.date_deces)
 
   return (
     <>
@@ -108,31 +104,32 @@ export default function Personalities() {
       </div>
 
       <div className="page-body">
-        <PersonTable
-          title="Vivantes"
-          subtitle="Personnalités actuellement en base côté joueurs"
-          endpoint="/alive-persons"
-          type="alive"
-          editTarget={editTarget}
-          setEditTarget={setEditTarget}
-        />
-        <PersonTable
-          title="Décédées"
-          subtitle="Décès enregistrés"
-          endpoint="/death-persons"
-          type="dead"
-          showDeath
-          editTarget={editTarget}
-          setEditTarget={setEditTarget}
-        />
+        {loading ? (
+          <div className="loading"><div className="spinner" /> Chargement...</div>
+        ) : (
+          <>
+            <PersonTable
+              title="Vivantes"
+              subtitle="Personnalités sélectionnables par les joueurs"
+              persons={alive}
+              setEditTarget={setEditTarget}
+            />
+            <PersonTable
+              title="Décédées"
+              subtitle="Décès enregistrés"
+              persons={dead}
+              showDeath
+              setEditTarget={setEditTarget}
+            />
+          </>
+        )}
       </div>
 
       {editTarget && (
         <AdminPersonModal
-          person={editTarget.person}
-          type={editTarget.type}
+          person={editTarget}
           onClose={() => setEditTarget(null)}
-          onSaved={(updated) => editTarget.onSaved(updated)}
+          onSaved={handleSaved}
         />
       )}
     </>

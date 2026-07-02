@@ -1,11 +1,13 @@
-// Synchronise les personnalités (alivePerson / deathPerson) de la base locale
-// vers Neon, sans jamais toucher users / playerSelection / regles.
+// Synchronise les personnalités (table unique "personnalite") de la base locale
+// vers Neon, sans jamais toucher users / playerSelection / regles / personEdit.
 //
-// N'insère que les données de référence "en base" (créées par seed ou import
-// en masse, created_by IS NULL) — jamais les entrées produites par un joueur
-// via l'appli (propositions, signalements de décès en cours de test local).
-// N'insère jamais un doublon : une personne déjà présente sur Neon (même
-// nom+prénom, insensible à la casse) est ignorée.
+// Prérequis : la base Neon doit avoir été migrée vers le schéma "personnalite"
+// (le backend applique la migration automatiquement à son démarrage).
+//
+// N'insère que les données de référence validées créées hors application
+// (created_by IS NULL) — jamais les entrées produites par un joueur. N'insère
+// jamais un doublon : une personne déjà présente sur Neon (même nom+prénom,
+// insensible à la casse) est ignorée.
 //
 // Usage :
 //   NEON_DATABASE_URL="postgresql://...neon.tech/..." node scripts/sync-personalities-to-neon.js
@@ -33,43 +35,16 @@ function sslFor(url) {
 const local = new Pool({ connectionString: LOCAL_DATABASE_URL, ssl: sslFor(LOCAL_DATABASE_URL) })
 const neon = new Pool({ connectionString: NEON_DATABASE_URL, ssl: sslFor(NEON_DATABASE_URL) })
 
-async function syncAlivePersons() {
-  const { rows } = await local.query(
-    `SELECT nom, prenom, categorie, nationalite, date_naissance, a_verifier
-     FROM "alivePerson" WHERE statut = 'validee'`
-  )
-
-  let inserted = 0, skipped = 0
-  for (const p of rows) {
-    const { rows: existing } = await neon.query(
-      `SELECT id FROM "alivePerson"
-       WHERE lower(nom) = lower($1) AND lower(COALESCE(prenom, '')) = lower(COALESCE($2, '')) AND statut = 'validee'`,
-      [p.nom, p.prenom]
-    )
-    if (existing[0]) { skipped++; continue }
-
-    if (APPLY) {
-      await neon.query(
-        `INSERT INTO "alivePerson" (nom, prenom, categorie, nationalite, date_naissance, a_verifier, statut)
-         VALUES ($1, $2, $3, $4, $5, $6, 'validee')`,
-        [p.nom, p.prenom, p.categorie, p.nationalite, p.date_naissance, p.a_verifier]
-      )
-    }
-    inserted++
-  }
-  return { table: 'alivePerson', inserted, skipped }
-}
-
-async function syncDeathPersons() {
+async function syncPersonnalites() {
   const { rows } = await local.query(
     `SELECT nom, prenom, categorie, nationalite, date_naissance, date_deces, a_verifier
-     FROM "deathPerson" WHERE statut = 'validee' AND created_by IS NULL`
+     FROM "personnalite" WHERE statut = 'validee' AND created_by IS NULL`
   )
 
   let inserted = 0, skipped = 0
   for (const p of rows) {
     const { rows: existing } = await neon.query(
-      `SELECT id FROM "deathPerson"
+      `SELECT id FROM "personnalite"
        WHERE lower(nom) = lower($1) AND lower(COALESCE(prenom, '')) = lower(COALESCE($2, '')) AND statut = 'validee'`,
       [p.nom, p.prenom]
     )
@@ -77,23 +52,21 @@ async function syncDeathPersons() {
 
     if (APPLY) {
       await neon.query(
-        `INSERT INTO "deathPerson" (nom, prenom, categorie, nationalite, date_naissance, date_deces, a_verifier, statut)
+        `INSERT INTO "personnalite" (nom, prenom, categorie, nationalite, date_naissance, date_deces, a_verifier, statut)
          VALUES ($1, $2, $3, $4, $5, $6, $7, 'validee')`,
         [p.nom, p.prenom, p.categorie, p.nationalite, p.date_naissance, p.date_deces, p.a_verifier]
       )
     }
     inserted++
   }
-  return { table: 'deathPerson', inserted, skipped }
+  return { inserted, skipped }
 }
 
 ;(async () => {
   try {
     console.log(APPLY ? 'Mode APPLY : écriture réelle sur Neon.' : 'Mode DRY-RUN : aucune écriture (relancer avec --apply pour appliquer).')
-    const results = await Promise.all([syncAlivePersons(), syncDeathPersons()])
-    for (const r of results) {
-      console.log(`${r.table} : ${r.inserted} ${APPLY ? 'insérées' : 'à insérer'}, ${r.skipped} déjà présentes (ignorées)`)
-    }
+    const r = await syncPersonnalites()
+    console.log(`personnalite : ${r.inserted} ${APPLY ? 'insérées' : 'à insérer'}, ${r.skipped} déjà présentes (ignorées)`)
   } catch (err) {
     console.error('Erreur pendant la synchronisation :', err.message)
     process.exitCode = 1

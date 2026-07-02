@@ -1,24 +1,13 @@
 import { useState } from 'react'
 import api from '../api/client'
+import { CATEGORIES_SUGGESTIONS, NATIONALITES } from '../lib/personOptions'
+import { today } from '../lib/format'
 
-const CATEGORIES_SUGGESTIONS = [
-  'Acteur/Actrice', 'Chanteur/Chanteuse', 'Musicien/Musicienne', 'Écrivain/Écrivaine',
-  'Footballeur/Footballeuse', 'Homme/Femme politique', 'Basketteur/Basketteuse',
-  'Réalisateur/Réalisatrice', 'Humoriste', 'Danseur/Danseuse', 'Scientifique',
-  'Journaliste', 'Peintre/Sculpteur', 'Rugbyman/Rugbywoman', 'Cycliste',
-]
-
-const NATIONALITES = [
-  'Allemand(e)', 'Américain(e)', 'Anglais(e)', 'Argentin(e)', 'Autrichien(ne)',
-  'Belge', 'Canadien(ne)', 'Espagnol(e)', 'Français(e)', 'Grec(que)', 'Indien(ne)',
-  'Irlandais(e)', 'Italien(ne)', 'Japonais(e)', 'Néerlandais(e)', 'Polonais(e)',
-  'Portugais(e)', 'Russe', 'Sénégalais(e)', 'Sud-Africain(e)', 'Suisse', 'Turc(que)',
-]
-
-// type: 'alive' | 'dead' — édition directe par un admin, appliquée immédiatement
-// (pas de file de validation : l'admin a déjà l'autorité de validation).
-export default function AdminPersonModal({ person, type, onClose, onSaved }) {
-  const isDead = type === 'dead'
+// Édition directe par un admin, appliquée immédiatement (pas de file de
+// validation : l'admin a déjà l'autorité). La date de décès est éditable
+// librement : la renseigner marque la personne décédée (points attribués
+// côté backend), la vider la considère vivante.
+export default function AdminPersonModal({ person, onClose, onSaved }) {
   const [form, setForm] = useState({
     nom: person.nom || '',
     prenom: person.prenom || '',
@@ -50,16 +39,14 @@ export default function AdminPersonModal({ person, type, onClose, onSaved }) {
     setError('')
     setSaving(true)
     try {
-      const payload = {
+      const { data } = await api.put(`/personnalites/${person.id}`, {
         nom: form.nom,
         prenom: form.prenom,
         categorie: form.categorie,
         nationalite: form.nationalite,
         date_naissance: form.date_naissance || null,
-      }
-      if (isDead) payload.date_deces = form.date_deces
-      const endpoint = isDead ? `/death-persons/${person.id}` : `/alive-persons/${person.id}`
-      const { data } = await api.put(endpoint, payload)
+        date_deces: form.date_deces || null,
+      })
       onSaved(data)
       onClose()
     } catch (err) {
@@ -118,16 +105,14 @@ export default function AdminPersonModal({ person, type, onClose, onSaved }) {
                 <label>Date de naissance</label>
                 <input className="form-input" type="date" value={form.date_naissance}
                   onChange={e => set('date_naissance', e.target.value)}
-                  min="1900-01-01" max="2026-07-03" />
+                  min="1900-01-01" max={today()} />
               </div>
-              {isDead && (
-                <div className="form-group">
-                  <label>Date de décès *</label>
-                  <input className="form-input" type="date" value={form.date_deces}
-                    onChange={e => set('date_deces', e.target.value)}
-                    min="1900-01-01" max="2026-07-03" required />
-                </div>
-              )}
+              <div className="form-group">
+                <label>Date de décès (vide = vivante)</label>
+                <input className="form-input" type="date" value={form.date_deces}
+                  onChange={e => set('date_deces', e.target.value)}
+                  min="1900-01-01" max={today()} />
+              </div>
             </div>
           </div>
 

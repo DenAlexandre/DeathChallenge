@@ -3,29 +3,7 @@ import api from '../api/client'
 import CreatePersonModal from '../components/CreatePersonModal'
 import ReportDeathModal from '../components/ReportDeathModal'
 import EditPersonModal from '../components/EditPersonModal'
-
-function formatBirth(p) {
-  if (p.date_naissance) {
-    const [y, m, d] = p.date_naissance.split('-')
-    return `${d}/${m}/${y}`
-  }
-  return '—'
-}
-
-function calculateAge(dateNaissance) {
-  if (!dateNaissance) return null
-  const birth = new Date(dateNaissance)
-  const today = new Date()
-  let age = today.getFullYear() - birth.getFullYear()
-  const monthDiff = today.getMonth() - birth.getMonth()
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) age--
-  return age
-}
-
-function formatAge(dateNaissance) {
-  const age = calculateAge(dateNaissance)
-  return age === null ? '—' : `${age} ans`
-}
+import { formatDate, formatAge } from '../lib/format'
 
 export default function Selection() {
   const [mySelection, setMySelection] = useState([])
@@ -59,7 +37,7 @@ export default function Selection() {
     if (query.trim().length < 2) return
     setSearching(true)
     try {
-      const { data } = await api.get('/alive-persons', { params: { q: query.trim() } })
+      const { data } = await api.get('/personnalites', { params: { q: query.trim() } })
       setResults(data.results)
       setDeathMatches(data.deathMatches)
     } finally {
@@ -80,12 +58,12 @@ export default function Selection() {
 
   const totalPoints = mySelection.reduce((sum, p) => sum + (p.points || 0), 0)
   const isFull = selectionLimit !== null && mySelection.length >= selectionLimit
-  const selectedIds = new Set(mySelection.map(s => s.alive_person_id))
+  const selectedIds = new Set(mySelection.map(s => s.person_id))
 
-  const handleAdd = async (alivePersonId) => {
+  const handleAdd = async (personId) => {
     setAddError('')
     try {
-      await api.post('/selections', { alivePersonId })
+      await api.post('/selections', { personId })
       await loadSelection()
     } catch (err) {
       setAddError(err.response?.data?.error || "Erreur lors de l'ajout")
@@ -143,7 +121,7 @@ export default function Selection() {
                       <td className="fw-600">{p.prenom} {p.nom}</td>
                       <td><span className="badge badge-cat">{p.categorie || '—'}</span></td>
                       <td className="text-muted text-sm">{p.nationalite || '—'}</td>
-                      <td className="text-muted text-sm">{formatBirth(p)}</td>
+                      <td className="text-muted text-sm">{formatDate(p.date_naissance)}</td>
                       <td className="text-muted text-sm">{formatAge(p.date_naissance)}</td>
                       <td>
                         {p.deja_decede && (
@@ -164,11 +142,11 @@ export default function Selection() {
                             <>
                               <button className="btn btn-ghost btn-sm" title="Modifier"
                                 onClick={() => setEditTarget({
-                                  id: p.alive_person_id, nom: p.nom, prenom: p.prenom,
+                                  id: p.person_id, nom: p.nom, prenom: p.prenom,
                                   categorie: p.categorie, nationalite: p.nationalite, date_naissance: p.date_naissance,
                                 })}>✏️</button>
                               <button className="btn btn-ghost btn-sm" title="Signaler le décès"
-                                onClick={() => setReportTarget({ id: p.alive_person_id, nom: p.nom, prenom: p.prenom })}>☠️</button>
+                                onClick={() => setReportTarget({ id: p.person_id, nom: p.nom, prenom: p.prenom })}>☠️</button>
                             </>
                           )}
                           <button className="btn btn-ghost btn-sm" title="Retirer"
@@ -244,7 +222,7 @@ export default function Selection() {
                             <td className="fw-600">{r.prenom} {r.nom}</td>
                             <td><span className="badge badge-cat">{r.categorie || '—'}</span></td>
                             <td className="text-muted text-sm">{r.nationalite || '—'}</td>
-                            <td className="text-muted text-sm">{formatBirth(r)}</td>
+                            <td className="text-muted text-sm">{formatDate(r.date_naissance)}</td>
                             <td className="text-muted text-sm">{formatAge(r.date_naissance)}</td>
                             <td>
                               {r.deja_decede ? (
