@@ -1,4 +1,5 @@
-import { Outlet, NavLink } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 const ROLE_LABELS = { admin: 'Administrateur', joueur: 'Joueur' }
@@ -6,10 +7,24 @@ const ROLE_LABELS = { admin: 'Administrateur', joueur: 'Joueur' }
 export default function Layout() {
   const { user, logout } = useAuth()
   const isAdmin = user?.role === 'admin'
+  const [menuOpen, setMenuOpen] = useState(false)
+  const location = useLocation()
+
+  // Referme le tiroir mobile à chaque changement de page.
+  useEffect(() => { setMenuOpen(false) }, [location.pathname])
 
   return (
     <div className="app-layout">
-      <aside className="sidebar">
+      <div className="mobile-topbar">
+        <button className="mobile-menu-btn" onClick={() => setMenuOpen(v => !v)} aria-label="Menu">
+          {menuOpen ? '✕' : '☰'}
+        </button>
+        <span className="mobile-topbar-title">💀 Death Challenge</span>
+      </div>
+
+      {menuOpen && <div className="sidebar-backdrop" onClick={() => setMenuOpen(false)} />}
+
+      <aside className={`sidebar${menuOpen ? ' open' : ''}`}>
         <div className="sidebar-logo">
           <div className="sidebar-logo-icon">💀</div>
           <div>
