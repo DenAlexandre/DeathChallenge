@@ -130,6 +130,9 @@ async function initDB() {
       UNIQUE(user_id, alive_person_id)
     )
   `)
+  // Renseigné (100 - âge au décès, min 0) quand la personne sélectionnée décède et que
+  // le décès est validé par un admin ; reste NULL tant qu'elle est vivante.
+  await db.query(`ALTER TABLE "playerSelection" ADD COLUMN IF NOT EXISTS points INTEGER`)
 }
 
 async function seed() {

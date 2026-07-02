@@ -12,6 +12,19 @@ router.get('/', authenticate, requireRole('admin'), async (req, res) => {
   res.json(rows)
 })
 
+router.get('/leaderboard', authenticate, requireRole('admin'), async (req, res) => {
+  const { rows } = await db.query(`
+    SELECT u.id, u.username,
+           COALESCE(SUM(ps.points), 0)::int AS total_points,
+           COUNT(ps.points) FILTER (WHERE ps.points IS NOT NULL)::int AS deces_count
+    FROM users u
+    LEFT JOIN "playerSelection" ps ON ps.user_id = u.id
+    GROUP BY u.id, u.username
+    ORDER BY total_points DESC, u.username
+  `)
+  res.json(rows)
+})
+
 router.post('/', authenticate, requireRole('admin'), async (req, res) => {
   const { username, email, password, role } = req.body
   if (!username?.trim() || !password) {

@@ -4,6 +4,19 @@ const { authenticate, requireRole } = require('../middleware/auth')
 
 const router = express.Router()
 
+function calculateAge(dateNaissance, anneeNaissance, dateDeces) {
+  const death = new Date(dateDeces)
+  if (dateNaissance) {
+    const birth = new Date(dateNaissance)
+    let age = death.getFullYear() - birth.getFullYear()
+    const monthDiff = death.getMonth() - birth.getMonth()
+    if (monthDiff < 0 || (monthDiff === 0 && death.getDate() < birth.getDate())) age--
+    return age
+  }
+  if (anneeNaissance) return death.getFullYear() - anneeNaissance
+  return null
+}
+
 router.get('/pending', authenticate, requireRole('admin'), async (req, res) => {
   const { rows } = await db.query(
     `SELECT dp.id, dp.nom, dp.prenom, dp.categorie, dp.date_naissance, dp.date_deces, dp.nationalite,
@@ -44,19 +57,31 @@ router.post('/', authenticate, async (req, res) => {
 
 router.put('/:id/validate', authenticate, requireRole('admin'), async (req, res) => {
   const { rows } = await db.query(
-    `UPDATE "deathPerson" SET statut = 'validee' WHERE id = $1 RETURNING id, nom, prenom, statut, alive_person_id`,
+    `UPDATE "deathPerson" SET statut = 'validee' WHERE id = $1
+     RETURNING id, nom, prenom, statut, alive_person_id, date_deces`,
     [req.params.id]
   )
   const deathPerson = rows[0]
   if (!deathPerson) return res.status(404).json({ error: 'Personne non trouvée' })
 
   if (deathPerson.alive_person_id) {
+    const { rows: personRows } = await db.query(
+      `SELECT date_naissance, annee_naissance FROM "alivePerson" WHERE id = $1`,
+      [deathPerson.alive_person_id]
+    )
     const { rows: selectionRows } = await db.query(
       `SELECT 1 FROM "playerSelection" WHERE alive_person_id = $1 LIMIT 1`,
       [deathPerson.alive_person_id]
     )
+
+    if (selectionRows[0] && personRows[0]) {
+      const age = calculateAge(personRows[0].date_naissance, personRows[0].annee_naissance, deathPerson.date_deces)
+      const points = age === null ? 0 : Math.max(0, 100 - age)
+      await db.query(`UPDATE "playerSelection" SET points = $1 WHERE alive_person_id = $2`, [points, deathPerson.alive_person_id])
+    }
+
     // Un joueur a cette personne dans sa sélection : on la marque décédée au lieu de
-    // la supprimer, pour ne pas perdre (cascade FK) son historique de pari.
+    // la supprimer, pour ne pas perdre (cascade FK) son historique de pari (et ses points).
     if (selectionRows[0]) {
       await db.query(`UPDATE "alivePerson" SET statut = 'decedee' WHERE id = $1`, [deathPerson.alive_person_id])
     } else {

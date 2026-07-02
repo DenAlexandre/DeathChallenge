@@ -55,6 +55,7 @@ export default function Selection() {
     return () => clearTimeout(debounceRef.current)
   }, [query])
 
+  const totalPoints = mySelection.reduce((sum, p) => sum + (p.points || 0), 0)
   const isFull = mySelection.length >= MAX_SELECTION
   const selectedIds = new Set(mySelection.map(s => s.alive_person_id))
 
@@ -84,7 +85,9 @@ export default function Selection() {
       <div className="page-header">
         <div>
           <div className="page-title">Ma sélection</div>
-          <div className="page-subtitle">{mySelection.length}/{MAX_SELECTION} personnalités choisies</div>
+          <div className="page-subtitle">
+            {mySelection.length}/{MAX_SELECTION} personnalités choisies · {totalPoints} point{totalPoints > 1 ? 's' : ''}
+          </div>
         </div>
       </div>
 
@@ -118,7 +121,11 @@ export default function Selection() {
                       <td className="text-muted text-sm">{p.nationalite || '—'}</td>
                       <td className="text-muted text-sm">{formatBirth(p)}</td>
                       <td>
-                        {p.deja_decede && <span className="badge badge-deceased">⚠️ Décédée</span>}
+                        {p.deja_decede && (
+                          <span className="badge badge-deceased">
+                            ⚠️ Décédée{p.points != null ? ` — +${p.points} pts` : ''}
+                          </span>
+                        )}
                         {!p.deja_decede && p.statut === 'en_attente' && (
                           <span className="badge badge-en-attente">En attente de validation</span>
                         )}

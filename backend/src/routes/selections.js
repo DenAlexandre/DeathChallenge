@@ -8,7 +8,7 @@ const MAX_SELECTION = 10
 
 router.get('/', authenticate, async (req, res) => {
   const { rows } = await db.query(
-    `SELECT s.id, ap.id AS alive_person_id, ap.nom, ap.prenom, ap.categorie,
+    `SELECT s.id, s.points, ap.id AS alive_person_id, ap.nom, ap.prenom, ap.categorie,
             ap.annee_naissance, ap.date_naissance, ap.nationalite, ap.statut,
             EXISTS (
               SELECT 1 FROM "deathPerson" dp
