@@ -39,7 +39,7 @@ export default function UserModal({ user, onClose, onSaved }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay">
       <div className="modal" style={{ maxWidth: 440 }}>
         <div className="modal-header">
           <div className="modal-title">

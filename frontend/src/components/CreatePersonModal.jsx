@@ -8,6 +8,13 @@ const CATEGORIES_SUGGESTIONS = [
   'Journaliste', 'Peintre/Sculpteur', 'Rugbyman/Rugbywoman', 'Cycliste',
 ]
 
+const NATIONALITES = [
+  'Allemand(e)', 'Américain(e)', 'Anglais(e)', 'Argentin(e)', 'Autrichien(ne)',
+  'Belge', 'Canadien(ne)', 'Espagnol(e)', 'Français(e)', 'Grec(que)', 'Indien(ne)',
+  'Irlandais(e)', 'Italien(ne)', 'Japonais(e)', 'Néerlandais(e)', 'Polonais(e)',
+  'Portugais(e)', 'Russe', 'Sénégalais(e)', 'Sud-Africain(e)', 'Suisse', 'Turc(que)',
+]
+
 export default function CreatePersonModal({ initialNom, initialPrenom, onClose, onCreated }) {
   const [statutVital, setStatutVital] = useState('vivante') // 'vivante' | 'decedee'
   const [form, setForm] = useState({
@@ -20,9 +27,20 @@ export default function CreatePersonModal({ initialNom, initialPrenom, onClose, 
   })
   const [error,  setError]  = useState('')
   const [saving, setSaving] = useState(false)
+  const [nationaliteAutre, setNationaliteAutre] = useState(false)
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
   const isDecedee = statutVital === 'decedee'
+
+  const handleNationaliteSelect = v => {
+    if (v === 'Autre') {
+      setNationaliteAutre(true)
+      set('nationalite', '')
+    } else {
+      setNationaliteAutre(false)
+      set('nationalite', v)
+    }
+  }
 
   const handleSubmit = async e => {
     e.preventDefault()
@@ -112,8 +130,17 @@ export default function CreatePersonModal({ initialNom, initialPrenom, onClose, 
               </div>
               <div className="form-group">
                 <label>Nationalité</label>
-                <input className="form-input" value={form.nationalite}
-                  onChange={e => set('nationalite', e.target.value)} />
+                <select className="form-select" value={nationaliteAutre ? 'Autre' : form.nationalite}
+                  onChange={e => handleNationaliteSelect(e.target.value)}>
+                  <option value="">Sélectionner...</option>
+                  {NATIONALITES.map(n => <option key={n} value={n}>{n}</option>)}
+                  <option value="Autre">Autre...</option>
+                </select>
+                {nationaliteAutre && (
+                  <input className="form-input" style={{ marginTop: 8 }} value={form.nationalite}
+                    onChange={e => set('nationalite', e.target.value)}
+                    placeholder="Préciser la nationalité" autoFocus />
+                )}
               </div>
               <div className="form-group">
                 <label>Date de naissance{isDecedee ? '' : ' *'}</label>
