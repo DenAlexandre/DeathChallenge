@@ -48,6 +48,14 @@ router.get('/pending', authenticate, requireRole('admin'), async (req, res) => {
   res.json(rows)
 })
 
+router.get('/all', authenticate, requireRole('admin'), async (req, res) => {
+  const { rows } = await db.query(
+    `SELECT id, nom, prenom, categorie, nationalite, date_naissance, statut
+     FROM "alivePerson" ORDER BY nom, prenom`
+  )
+  res.json(rows)
+})
+
 router.post('/', authenticate, async (req, res) => {
   const { nom, prenom, categorie, nationalite, date_naissance } = req.body
   if (!nom?.trim() || !prenom?.trim()) {
@@ -117,6 +125,22 @@ router.put('/:id/validate', authenticate, requireRole('admin'), async (req, res)
   const { rows } = await db.query(
     `UPDATE "alivePerson" SET statut = 'validee' WHERE id = $1 RETURNING id, nom, prenom, statut`,
     [req.params.id]
+  )
+  if (!rows[0]) return res.status(404).json({ error: 'Personne non trouvée' })
+  res.json(rows[0])
+})
+
+router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
+  const { nom, prenom, categorie, nationalite, date_naissance } = req.body
+  if (!nom?.trim() || !prenom?.trim()) {
+    return res.status(400).json({ error: 'Nom et prénom requis' })
+  }
+
+  const { rows } = await db.query(
+    `UPDATE "alivePerson" SET nom = $1, prenom = $2, categorie = $3, nationalite = $4, date_naissance = $5
+     WHERE id = $6
+     RETURNING id, nom, prenom, categorie, nationalite, date_naissance, statut`,
+    [nom.trim(), prenom.trim(), categorie || null, nationalite || null, date_naissance || null, req.params.id]
   )
   if (!rows[0]) return res.status(404).json({ error: 'Personne non trouvée' })
   res.json(rows[0])

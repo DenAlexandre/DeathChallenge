@@ -37,6 +37,12 @@ export default function Layout() {
                 <span>✅</span> Validation
               </NavLink>
               <NavLink
+                to="/personnalites"
+                className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}
+              >
+                <span>👥</span> Personnalités
+              </NavLink>
+              <NavLink
                 to="/classement"
                 className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}
               >

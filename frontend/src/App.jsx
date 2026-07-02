@@ -7,6 +7,7 @@ import Selection        from './pages/Selection'
 import PendingValidation from './pages/PendingValidation'
 import Leaderboard       from './pages/Leaderboard'
 import Regles            from './pages/Regles'
+import Personalities     from './pages/Personalities'
 
 function ProtectedRoute({ children, requiredRole }) {
   const { user, loading } = useAuth()
@@ -48,6 +49,9 @@ export default function App() {
             } />
             <Route path="regles" element={
               <ProtectedRoute requiredRole="admin"><Regles /></ProtectedRoute>
+            } />
+            <Route path="personnalites" element={
+              <ProtectedRoute requiredRole="admin"><Personalities /></ProtectedRoute>
             } />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

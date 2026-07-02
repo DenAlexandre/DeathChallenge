@@ -18,6 +18,14 @@ router.get('/pending', authenticate, requireRole('admin'), async (req, res) => {
   res.json(rows)
 })
 
+router.get('/all', authenticate, requireRole('admin'), async (req, res) => {
+  const { rows } = await db.query(
+    `SELECT id, nom, prenom, categorie, nationalite, date_naissance, date_deces, statut
+     FROM "deathPerson" ORDER BY nom, prenom`
+  )
+  res.json(rows)
+})
+
 router.post('/', authenticate, async (req, res) => {
   const { nom, prenom, categorie, nationalite, date_naissance, date_deces } = req.body
   if (!nom?.trim() || !prenom?.trim()) {
@@ -62,6 +70,25 @@ router.put('/:id/validate', authenticate, requireRole('admin'), async (req, res)
   }
 
   res.json({ id: deathPerson.id, nom: deathPerson.nom, prenom: deathPerson.prenom, statut: deathPerson.statut })
+})
+
+router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
+  const { nom, prenom, categorie, nationalite, date_naissance, date_deces } = req.body
+  if (!nom?.trim() || !prenom?.trim()) {
+    return res.status(400).json({ error: 'Nom et prénom requis' })
+  }
+  if (!date_deces) {
+    return res.status(400).json({ error: 'Date de décès requise' })
+  }
+
+  const { rows } = await db.query(
+    `UPDATE "deathPerson" SET nom = $1, prenom = $2, categorie = $3, nationalite = $4, date_naissance = $5, date_deces = $6
+     WHERE id = $7
+     RETURNING id, nom, prenom, categorie, nationalite, date_naissance, date_deces, statut`,
+    [nom.trim(), prenom.trim(), categorie || null, nationalite || null, date_naissance || null, date_deces, req.params.id]
+  )
+  if (!rows[0]) return res.status(404).json({ error: 'Personne non trouvée' })
+  res.json(rows[0])
 })
 
 router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
