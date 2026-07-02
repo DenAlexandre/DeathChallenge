@@ -3,8 +3,6 @@ import api from '../api/client'
 import CreatePersonModal from '../components/CreatePersonModal'
 import ReportDeathModal from '../components/ReportDeathModal'
 
-const MAX_SELECTION = 10
-
 function formatBirth(p) {
   if (p.date_naissance) {
     const [y, m, d] = p.date_naissance.split('-')
@@ -23,6 +21,7 @@ export default function Selection() {
   const [addError,     setAddError]   = useState('')
   const [showCreate,   setShowCreate] = useState(false)
   const [reportTarget, setReportTarget] = useState(null)
+  const [regles,       setRegles]       = useState([])
   const debounceRef = useRef(null)
 
   const loadSelection = () => {
@@ -30,7 +29,14 @@ export default function Selection() {
     return api.get('/selections').then(({ data }) => setMySelection(data)).finally(() => setLoading(false))
   }
 
-  useEffect(() => { loadSelection() }, [])
+  useEffect(() => {
+    loadSelection()
+    api.get('/regles').then(({ data }) => setRegles(data))
+  }, [])
+
+  const limiteRegle = regles.find(r => r.code === 'limite_selection')
+  const selectionLimit = limiteRegle && limiteRegle.active === false ? null : (limiteRegle?.valeur ?? 10)
+  const validationRequired = regles.find(r => r.code === 'validation_admin')?.active !== false
 
   const runSearch = async () => {
     if (query.trim().length < 2) return
@@ -56,7 +62,7 @@ export default function Selection() {
   }, [query])
 
   const totalPoints = mySelection.reduce((sum, p) => sum + (p.points || 0), 0)
-  const isFull = mySelection.length >= MAX_SELECTION
+  const isFull = selectionLimit !== null && mySelection.length >= selectionLimit
   const selectedIds = new Set(mySelection.map(s => s.alive_person_id))
 
   const handleAdd = async (alivePersonId) => {
@@ -86,7 +92,7 @@ export default function Selection() {
         <div>
           <div className="page-title">Ma sélection</div>
           <div className="page-subtitle">
-            {mySelection.length}/{MAX_SELECTION} personnalités choisies · {totalPoints} point{totalPoints > 1 ? 's' : ''}
+            {mySelection.length}{selectionLimit !== null ? `/${selectionLimit}` : ''} personnalités choisies · {totalPoints} point{totalPoints > 1 ? 's' : ''}
           </div>
         </div>
       </div>
@@ -245,6 +251,7 @@ export default function Selection() {
         <CreatePersonModal
           initialNom={queryNom}
           initialPrenom={queryPrenom}
+          validationRequired={validationRequired}
           onClose={() => setShowCreate(false)}
           onCreated={loadSelection}
         />
@@ -253,6 +260,7 @@ export default function Selection() {
       {reportTarget && (
         <ReportDeathModal
           person={reportTarget}
+          validationRequired={validationRequired}
           onClose={() => setReportTarget(null)}
           onReported={() => { loadSelection(); runSearch() }}
         />

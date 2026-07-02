@@ -1,6 +1,8 @@
 const express = require('express')
 const db = require('../db')
 const { authenticate, requireRole } = require('../middleware/auth')
+const { getRegle } = require('../regles')
+const { applyDeathToAlivePerson } = require('../services/deathService')
 
 const router = express.Router()
 
@@ -62,11 +64,14 @@ router.post('/', authenticate, async (req, res) => {
 
   const anneeNaissance = date_naissance ? new Date(date_naissance).getFullYear() : null
 
+  const validationRegle = await getRegle('validation_admin')
+  const statut = validationRegle?.active === false ? 'validee' : 'en_attente'
+
   const { rows } = await db.query(
     `INSERT INTO "alivePerson" (nom, prenom, categorie, nationalite, date_naissance, annee_naissance, statut, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, 'en_attente', $7)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING id, nom, prenom, categorie, annee_naissance, date_naissance, nationalite, statut`,
-    [nom.trim(), prenom.trim(), categorie || null, nationalite || null, date_naissance || null, anneeNaissance, req.user.id]
+    [nom.trim(), prenom.trim(), categorie || null, nationalite || null, date_naissance || null, anneeNaissance, statut, req.user.id]
   )
   res.status(201).json(rows[0])
 })
@@ -91,12 +96,22 @@ router.post('/:id/report-death', authenticate, async (req, res) => {
     return res.status(409).json({ error: 'Un décès est déjà enregistré ou en attente de validation pour cette personne' })
   }
 
+  const validationRegle = await getRegle('validation_admin')
+  const statut = validationRegle?.active === false ? 'validee' : 'en_attente'
+
   const { rows } = await db.query(
     `INSERT INTO "deathPerson" (nom, prenom, categorie, nationalite, date_naissance, date_deces, statut, created_by, alive_person_id)
-     VALUES ($1, $2, $3, $4, $5, $6, 'en_attente', $7, $8)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING id, nom, prenom, categorie, date_naissance, date_deces, nationalite, statut`,
-    [person.nom, person.prenom, person.categorie, person.nationalite, person.date_naissance, date_deces, req.user.id, person.id]
+    [person.nom, person.prenom, person.categorie, person.nationalite, person.date_naissance, date_deces, statut, req.user.id, person.id]
   )
+
+  // Validation désactivée : le décès prend effet tout de suite, pas d'attente admin.
+  if (statut === 'validee') {
+    const pointsRegle = await getRegle('points_calcul')
+    await applyDeathToAlivePerson(person.id, date_deces, pointsRegle?.active !== false)
+  }
+
   res.status(201).json(rows[0])
 })
 

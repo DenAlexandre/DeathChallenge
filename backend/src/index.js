@@ -16,6 +16,7 @@ app.use('/api/users',         require('./routes/users'))
 app.use('/api/alive-persons', require('./routes/alivePersons'))
 app.use('/api/death-persons', require('./routes/deathPersons'))
 app.use('/api/selections',    require('./routes/selections'))
+app.use('/api/regles',        require('./routes/regles'))
 app.get('/api/health',        (req, res) => res.json({ status: 'ok' }))
 
 app.use((err, req, res, next) => {
@@ -133,6 +134,19 @@ async function initDB() {
   // Renseigné (100 - âge au décès, min 0) quand la personne sélectionnée décède et que
   // le décès est validé par un admin ; reste NULL tant qu'elle est vivante.
   await db.query(`ALTER TABLE "playerSelection" ADD COLUMN IF NOT EXISTS points INTEGER`)
+
+  // Règles du jeu paramétrables : chaque ligne peut être activée/désactivée par un admin
+  // (et, pour certaines, avoir sa valeur ajustée) sans toucher au code.
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS "regles" (
+      id          SERIAL PRIMARY KEY,
+      code        VARCHAR(50) UNIQUE NOT NULL,
+      nom         VARCHAR(150) NOT NULL,
+      description TEXT,
+      active      BOOLEAN NOT NULL DEFAULT true,
+      valeur      INTEGER
+    )
+  `)
 }
 
 async function seed() {
@@ -151,6 +165,35 @@ async function seed() {
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (username) DO NOTHING`,
       [u.username, u.email, hash, u.role]
+    )
+  }
+}
+
+async function seedRegles() {
+  const defaults = [
+    {
+      code: 'points_calcul',
+      nom: 'Calcul des points au décès',
+      description: "Attribue (100 - âge au décès, minimum 0) points à chaque joueur ayant sélectionné la personne, lors de la validation du décès.",
+      valeur: null,
+    },
+    {
+      code: 'validation_admin',
+      nom: 'Validation administrateur obligatoire',
+      description: "Les personnalités proposées et les décès signalés par les joueurs doivent être validés par un administrateur avant d'être pris en compte.",
+      valeur: null,
+    },
+    {
+      code: 'limite_selection',
+      nom: 'Limite de sélection',
+      description: "Nombre maximum de personnalités qu'un joueur peut sélectionner simultanément.",
+      valeur: 10,
+    },
+  ]
+  for (const r of defaults) {
+    await db.query(
+      `INSERT INTO "regles" (code, nom, description, valeur) VALUES ($1, $2, $3, $4) ON CONFLICT (code) DO NOTHING`,
+      [r.code, r.nom, r.description, r.valeur]
     )
   }
 }
@@ -249,6 +292,7 @@ const PORT = process.env.PORT || 3001
     await waitForDB()
     await initDB()
     await seed()
+    await seedRegles()
     await seedDeathPersons()
     await seedAlivePersons()
     app.listen(PORT, () => console.log(`Backend démarré sur http://localhost:${PORT}`))

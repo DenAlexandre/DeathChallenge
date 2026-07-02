@@ -1,10 +1,9 @@
 const express = require('express')
 const db = require('../db')
 const { authenticate } = require('../middleware/auth')
+const { getRegle } = require('../regles')
 
 const router = express.Router()
-
-const MAX_SELECTION = 10
 
 router.get('/', authenticate, async (req, res) => {
   const { rows } = await db.query(
@@ -28,12 +27,16 @@ router.post('/', authenticate, async (req, res) => {
   const { alivePersonId } = req.body
   if (!alivePersonId) return res.status(400).json({ error: 'alivePersonId requis' })
 
-  const { rows: countRows } = await db.query(
-    'SELECT COUNT(*)::int AS count FROM "playerSelection" WHERE user_id = $1',
-    [req.user.id]
-  )
-  if (countRows[0].count >= MAX_SELECTION) {
-    return res.status(400).json({ error: `Liste déjà complète (${MAX_SELECTION}/${MAX_SELECTION})` })
+  const limiteRegle = await getRegle('limite_selection')
+  if (limiteRegle?.active !== false) {
+    const limite = limiteRegle?.valeur ?? 10
+    const { rows: countRows } = await db.query(
+      'SELECT COUNT(*)::int AS count FROM "playerSelection" WHERE user_id = $1',
+      [req.user.id]
+    )
+    if (countRows[0].count >= limite) {
+      return res.status(400).json({ error: `Liste déjà complète (${limite}/${limite})` })
+    }
   }
 
   const { rows: personRows } = await db.query('SELECT nom, prenom FROM "alivePerson" WHERE id = $1', [alivePersonId])

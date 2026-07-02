@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import api from '../api/client'
 
-export default function ReportDeathModal({ person, onClose, onReported }) {
+export default function ReportDeathModal({ person, validationRequired = true, onClose, onReported }) {
   const [dateDeces, setDateDeces] = useState('')
   const [error,     setError]     = useState('')
   const [saving,    setSaving]    = useState(false)
@@ -34,7 +34,9 @@ export default function ReportDeathModal({ person, onClose, onReported }) {
           <>
             <div className="modal-body">
               <div className="login-success">
-                ✅ Signalement envoyé. Un administrateur doit valider ce décès avant qu'il soit pris en compte.
+                {validationRequired
+                  ? "✅ Signalement envoyé. Un administrateur doit valider ce décès avant qu'il soit pris en compte."
+                  : '✅ Décès enregistré et pris en compte immédiatement.'}
               </div>
             </div>
             <div className="modal-footer">
@@ -47,8 +49,9 @@ export default function ReportDeathModal({ person, onClose, onReported }) {
               {error && <div className="login-error" style={{ marginBottom: 16 }}>{error}</div>}
 
               <p className="text-muted text-sm" style={{ margin: '0 0 14px' }}>
-                Ce décès sera enregistré avec le statut "en attente" le temps qu'un
-                administrateur vérifie et valide l'information.
+                {validationRequired
+                  ? 'Ce décès sera enregistré avec le statut "en attente" le temps qu\'un administrateur vérifie et valide l\'information.'
+                  : "La validation administrateur est désactivée : ce décès sera pris en compte immédiatement."}
               </p>
 
               <div className="form-group">

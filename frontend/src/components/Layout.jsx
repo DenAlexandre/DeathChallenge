@@ -42,6 +42,12 @@ export default function Layout() {
               >
                 <span>🏆</span> Classement
               </NavLink>
+              <NavLink
+                to="/regles"
+                className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}
+              >
+                <span>📜</span> Règles
+              </NavLink>
             </>
           ) : (
             <NavLink

@@ -15,7 +15,7 @@ const NATIONALITES = [
   'Portugais(e)', 'Russe', 'Sénégalais(e)', 'Sud-Africain(e)', 'Suisse', 'Turc(que)',
 ]
 
-export default function CreatePersonModal({ initialNom, initialPrenom, onClose, onCreated }) {
+export default function CreatePersonModal({ initialNom, initialPrenom, validationRequired = true, onClose, onCreated }) {
   const [statutVital, setStatutVital] = useState('vivante') // 'vivante' | 'decedee'
   const [form, setForm] = useState({
     nom: initialNom || '',
@@ -104,9 +104,13 @@ export default function CreatePersonModal({ initialNom, initialPrenom, onClose, 
             </div>
 
             <p className="text-muted text-sm" style={{ margin: '12px 0 14px' }}>
-              {isDecedee
-                ? "Ce décès sera enregistré avec le statut \"en attente\" le temps qu'un administrateur vérifie et valide les informations."
-                : 'Cette personne sera ajoutée à votre sélection avec le statut "en attente" le temps qu\'un administrateur vérifie et valide les informations.'}
+              {validationRequired
+                ? (isDecedee
+                    ? "Ce décès sera enregistré avec le statut \"en attente\" le temps qu'un administrateur vérifie et valide les informations."
+                    : 'Cette personne sera ajoutée à votre sélection avec le statut "en attente" le temps qu\'un administrateur vérifie et valide les informations.')
+                : (isDecedee
+                    ? 'La validation administrateur est désactivée : ce décès sera pris en compte immédiatement.'
+                    : 'La validation administrateur est désactivée : cette personne sera ajoutée à votre sélection immédiatement.')}
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

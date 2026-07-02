@@ -1,21 +1,10 @@
 const express = require('express')
 const db = require('../db')
 const { authenticate, requireRole } = require('../middleware/auth')
+const { getRegle } = require('../regles')
+const { applyDeathToAlivePerson } = require('../services/deathService')
 
 const router = express.Router()
-
-function calculateAge(dateNaissance, anneeNaissance, dateDeces) {
-  const death = new Date(dateDeces)
-  if (dateNaissance) {
-    const birth = new Date(dateNaissance)
-    let age = death.getFullYear() - birth.getFullYear()
-    const monthDiff = death.getMonth() - birth.getMonth()
-    if (monthDiff < 0 || (monthDiff === 0 && death.getDate() < birth.getDate())) age--
-    return age
-  }
-  if (anneeNaissance) return death.getFullYear() - anneeNaissance
-  return null
-}
 
 router.get('/pending', authenticate, requireRole('admin'), async (req, res) => {
   const { rows } = await db.query(
@@ -46,11 +35,14 @@ router.post('/', authenticate, async (req, res) => {
     return res.status(409).json({ error: 'Cette personne existe déjà dans la base des décès' })
   }
 
+  const validationRegle = await getRegle('validation_admin')
+  const statut = validationRegle?.active === false ? 'validee' : 'en_attente'
+
   const { rows } = await db.query(
     `INSERT INTO "deathPerson" (nom, prenom, categorie, nationalite, date_naissance, date_deces, statut, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, 'en_attente', $7)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING id, nom, prenom, categorie, date_naissance, date_deces, nationalite, statut`,
-    [nom.trim(), prenom.trim(), categorie || null, nationalite || null, date_naissance || null, date_deces, req.user.id]
+    [nom.trim(), prenom.trim(), categorie || null, nationalite || null, date_naissance || null, date_deces, statut, req.user.id]
   )
   res.status(201).json(rows[0])
 })
@@ -65,28 +57,8 @@ router.put('/:id/validate', authenticate, requireRole('admin'), async (req, res)
   if (!deathPerson) return res.status(404).json({ error: 'Personne non trouvée' })
 
   if (deathPerson.alive_person_id) {
-    const { rows: personRows } = await db.query(
-      `SELECT date_naissance, annee_naissance FROM "alivePerson" WHERE id = $1`,
-      [deathPerson.alive_person_id]
-    )
-    const { rows: selectionRows } = await db.query(
-      `SELECT 1 FROM "playerSelection" WHERE alive_person_id = $1 LIMIT 1`,
-      [deathPerson.alive_person_id]
-    )
-
-    if (selectionRows[0] && personRows[0]) {
-      const age = calculateAge(personRows[0].date_naissance, personRows[0].annee_naissance, deathPerson.date_deces)
-      const points = age === null ? 0 : Math.max(0, 100 - age)
-      await db.query(`UPDATE "playerSelection" SET points = $1 WHERE alive_person_id = $2`, [points, deathPerson.alive_person_id])
-    }
-
-    // Un joueur a cette personne dans sa sélection : on la marque décédée au lieu de
-    // la supprimer, pour ne pas perdre (cascade FK) son historique de pari (et ses points).
-    if (selectionRows[0]) {
-      await db.query(`UPDATE "alivePerson" SET statut = 'decedee' WHERE id = $1`, [deathPerson.alive_person_id])
-    } else {
-      await db.query(`DELETE FROM "alivePerson" WHERE id = $1`, [deathPerson.alive_person_id])
-    }
+    const pointsRegle = await getRegle('points_calcul')
+    await applyDeathToAlivePerson(deathPerson.alive_person_id, deathPerson.date_deces, pointsRegle?.active !== false)
   }
 
   res.json({ id: deathPerson.id, nom: deathPerson.nom, prenom: deathPerson.prenom, statut: deathPerson.statut })

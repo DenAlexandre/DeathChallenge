@@ -6,6 +6,7 @@ import Users            from './pages/Users'
 import Selection        from './pages/Selection'
 import PendingValidation from './pages/PendingValidation'
 import Leaderboard       from './pages/Leaderboard'
+import Regles            from './pages/Regles'
 
 function ProtectedRoute({ children, requiredRole }) {
   const { user, loading } = useAuth()
@@ -44,6 +45,9 @@ export default function App() {
             } />
             <Route path="classement" element={
               <ProtectedRoute requiredRole="admin"><Leaderboard /></ProtectedRoute>
+            } />
+            <Route path="regles" element={
+              <ProtectedRoute requiredRole="admin"><Regles /></ProtectedRoute>
             } />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
