@@ -1,4 +1,6 @@
 require('dotenv').config()
+const fs = require('fs')
+const path = require('path')
 const express = require('express')
 const cors = require('cors')
 const bcrypt = require('bcryptjs')
@@ -63,6 +65,19 @@ async function initDB() {
   `)
 
   await db.query(`
+    CREATE TABLE IF NOT EXISTS "deathPerson" (
+      id             SERIAL PRIMARY KEY,
+      nom            VARCHAR(150),
+      prenom         VARCHAR(150),
+      categorie      VARCHAR(150),
+      date_naissance DATE,
+      date_deces     DATE,
+      nationalite    VARCHAR(100),
+      a_verifier     TEXT
+    )
+  `)
+
+  await db.query(`
     CREATE OR REPLACE FUNCTION update_updated_at()
     RETURNS TRIGGER AS $$
     BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
@@ -99,6 +114,68 @@ async function seed() {
   console.log('Comptes par défaut créés : admin/admin123  editor/editor123  viewer/viewer123')
 }
 
+function parseCsvLine(line) {
+  const values = []
+  let current = ''
+  let inQuotes = false
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
+    if (inQuotes) {
+      if (char === '"') {
+        if (line[i + 1] === '"') { current += '"'; i++ }
+        else inQuotes = false
+      } else {
+        current += char
+      }
+    } else if (char === '"') {
+      inQuotes = true
+    } else if (char === ',') {
+      values.push(current)
+      current = ''
+    } else {
+      current += char
+    }
+  }
+  values.push(current)
+  return values
+}
+
+function parseCsv(content) {
+  const lines = content.split(/\r?\n/).filter(l => l.length > 0)
+  const header = parseCsvLine(lines[0])
+  return lines.slice(1).map(line => {
+    const values = parseCsvLine(line)
+    const record = {}
+    header.forEach((key, i) => { record[key] = values[i] ?? '' })
+    return record
+  })
+}
+
+async function seedDeathPersons() {
+  const { rows } = await db.query('SELECT COUNT(*)::int AS count FROM "deathPerson"')
+  if (rows[0].count > 0) return
+
+  const csvPath = path.join(__dirname, 'data', 'deathPerson.csv')
+  const records = parseCsv(fs.readFileSync(csvPath, 'utf8'))
+
+  for (const r of records) {
+    await db.query(
+      `INSERT INTO "deathPerson" (nom, prenom, categorie, date_naissance, date_deces, nationalite, a_verifier)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        r.nom || null,
+        r.prenom || null,
+        r.categorie || null,
+        r.date_naissance || null,
+        r.date_deces || null,
+        r.nationalite || null,
+        r.a_verifier || null,
+      ]
+    )
+  }
+  console.log(`${records.length} personnalités décédées importées dans deathPerson`)
+}
+
 const PORT = process.env.PORT || 3001
 
 ;(async () => {
@@ -106,6 +183,7 @@ const PORT = process.env.PORT || 3001
     await waitForDB()
     await initDB()
     await seed()
+    await seedDeathPersons()
     app.listen(PORT, () => console.log(`Backend démarré sur http://localhost:${PORT}`))
   } catch (err) {
     console.error('Erreur au démarrage :', err.message)
