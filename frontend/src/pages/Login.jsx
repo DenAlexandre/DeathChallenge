@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import PasswordInput from '../components/PasswordInput'
 
 const DEMO_USERS = [
   { username: 'admin',  password: 'admin123',  label: 'Administrateur', badge: 'badge-admin'  },
@@ -55,9 +56,8 @@ export default function Login() {
 
           <div className="login-fg">
             <label>Mot de passe</label>
-            <input
+            <PasswordInput
               className="login-input"
-              type="password"
               value={form.password}
               onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
               placeholder="Votre mot de passe"

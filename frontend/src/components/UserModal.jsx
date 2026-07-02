@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../api/client'
+import PasswordInput from './PasswordInput'
 
 export default function UserModal({ user, onClose, onSaved }) {
   const isEdit = !!user?.id
@@ -69,7 +70,7 @@ export default function UserModal({ user, onClose, onSaved }) {
                     ? 'Nouveau mot de passe (laisser vide pour conserver)'
                     : 'Mot de passe *'}
                 </label>
-                <input className="form-input" type="password" value={form.password}
+                <PasswordInput className="form-input" value={form.password}
                   onChange={e => set('password', e.target.value)} required={!isEdit} />
               </div>
               <div className="form-group">
