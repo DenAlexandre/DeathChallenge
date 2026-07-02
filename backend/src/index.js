@@ -57,19 +57,6 @@ async function initDB() {
   await db.query(`UPDATE users SET role = 'joueur' WHERE role IN ('editor', 'viewer')`)
   await db.query(`ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin', 'joueur'))`)
 
-  // La migration ci-dessus convertit les rôles des comptes existants (editor/viewer
-  // -> joueur) mais ne crée jamais de compte nommé littéralement "joueur" sur une
-  // base qui avait déjà des utilisateurs (seed() ne s'exécute que sur table vide).
-  // On le garantit ici indépendamment, pour que le raccourci de connexion "Joueur"
-  // de l'écran de login fonctionne toujours.
-  const joueurHash = await bcrypt.hash('joueur123', 10)
-  await db.query(
-    `INSERT INTO users (username, email, password_hash, role)
-     VALUES ('joueur', 'joueur@local', $1, 'joueur')
-     ON CONFLICT (username) DO NOTHING`,
-    [joueurHash]
-  )
-
   await db.query(`
     CREATE TABLE IF NOT EXISTS "deathPerson" (
       id             SERIAL PRIMARY KEY,
@@ -140,9 +127,10 @@ async function initDB() {
 }
 
 async function seed() {
-  const { rows } = await db.query('SELECT COUNT(*)::int AS count FROM users')
-  if (rows[0].count > 0) return
-
+  // Insertion idempotente par compte (ON CONFLICT DO NOTHING) plutôt qu'un
+  // garde-fou global sur "la table users est vide" : sur une base ancienne
+  // qui a déjà un compte mais pas l'autre (migration, interruption...), un
+  // garde-fou global sauterait la création du compte manquant indéfiniment.
   const defaults = [
     { username: 'admin',  email: 'admin@local',  password: 'admin123',  role: 'admin'  },
     { username: 'joueur', email: 'joueur@local', password: 'joueur123', role: 'joueur' },
@@ -150,11 +138,12 @@ async function seed() {
   for (const u of defaults) {
     const hash = await bcrypt.hash(u.password, 10)
     await db.query(
-      'INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4)',
+      `INSERT INTO users (username, email, password_hash, role)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (username) DO NOTHING`,
       [u.username, u.email, hash, u.role]
     )
   }
-  console.log('Comptes par défaut créés : admin/admin123  joueur/joueur123')
 }
 
 function parseCsvLine(line) {
