@@ -17,6 +17,7 @@ export default function Selection() {
   const [reportTarget, setReportTarget] = useState(null)
   const [editTarget,   setEditTarget]   = useState(null)
   const [regles,       setRegles]       = useState([])
+  const [sortDir,      setSortDir]      = useState(null)
   const debounceRef = useRef(null)
 
   const loadSelection = () => {
@@ -60,6 +61,14 @@ export default function Selection() {
   const totalPoints = mySelection.reduce((sum, p) => sum + (p.points || 0), 0)
   const isFull = selectionLimit !== null && mySelection.length >= selectionLimit
   const selectedIds = new Set(mySelection.map(s => s.person_id))
+
+  const toggleSort = () => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
+  const displayedSelection = sortDir
+    ? [...mySelection].sort((a, b) => {
+        const cmp = `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`)
+        return sortDir === 'asc' ? cmp : -cmp
+      })
+    : mySelection
 
   const handleAdd = async (personId) => {
     setAddError('')
@@ -116,7 +125,9 @@ export default function Selection() {
               <table>
                 <thead>
                   <tr>
-                    <th>Nom</th>
+                    <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={toggleSort}>
+                      Nom {sortDir === 'asc' ? '▲' : sortDir === 'desc' ? '▼' : ''}
+                    </th>
                     <th>Catégorie</th>
                     <th>Nationalité</th>
                     <th>Naissance</th>
@@ -126,7 +137,7 @@ export default function Selection() {
                   </tr>
                 </thead>
                 <tbody>
-                  {mySelection.map(p => (
+                  {displayedSelection.map(p => (
                     <tr key={p.id}>
                       <td className="fw-600">{p.prenom} {p.nom}</td>
                       <td><span className="badge badge-cat">{p.categorie || '—'}</span></td>
