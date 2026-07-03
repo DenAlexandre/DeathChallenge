@@ -3,7 +3,7 @@ import api from '../api/client'
 import { CATEGORIES_SUGGESTIONS, NATIONALITES } from '../lib/personOptions'
 import { today } from '../lib/format'
 
-export default function CreatePersonModal({ initialNom, initialPrenom, validationRequired = true, onClose, onCreated }) {
+export default function CreatePersonModal({ initialNom, initialPrenom, validationRequired = true, isFull = false, onClose, onCreated }) {
   const [statutVital, setStatutVital] = useState('vivante') // 'vivante' | 'decedee'
   const [form, setForm] = useState({
     nom: initialNom || '',
@@ -43,7 +43,7 @@ export default function CreatePersonModal({ initialNom, initialPrenom, validatio
         date_naissance: form.date_naissance || null,
         date_deces: isDecedee ? form.date_deces : null,
       })
-      if (!isDecedee) {
+      if (!isDecedee && !isFull) {
         await api.post('/selections', { personId: created.id })
       }
       onCreated()
@@ -84,13 +84,15 @@ export default function CreatePersonModal({ initialNom, initialPrenom, validatio
             </div>
 
             <p className="text-muted text-sm" style={{ margin: '12px 0 14px' }}>
-              {validationRequired
-                ? (isDecedee
-                    ? "Ce décès sera enregistré avec le statut \"en attente\" le temps qu'un administrateur vérifie et valide les informations."
-                    : 'Cette personne sera ajoutée à votre sélection avec le statut "en attente" le temps qu\'un administrateur vérifie et valide les informations.')
-                : (isDecedee
-                    ? 'La validation administrateur est désactivée : ce décès sera pris en compte immédiatement.'
-                    : 'La validation administrateur est désactivée : cette personne sera ajoutée à votre sélection immédiatement.')}
+              {!isDecedee && isFull
+                ? `Votre liste est complète : cette personne sera créée${validationRequired ? ' avec le statut "en attente"' : ''} mais ne sera pas ajoutée à votre sélection.`
+                : validationRequired
+                  ? (isDecedee
+                      ? "Ce décès sera enregistré avec le statut \"en attente\" le temps qu'un administrateur vérifie et valide les informations."
+                      : 'Cette personne sera ajoutée à votre sélection avec le statut "en attente" le temps qu\'un administrateur vérifie et valide les informations.')
+                  : (isDecedee
+                      ? 'La validation administrateur est désactivée : ce décès sera pris en compte immédiatement.'
+                      : 'La validation administrateur est désactivée : cette personne sera ajoutée à votre sélection immédiatement.')}
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

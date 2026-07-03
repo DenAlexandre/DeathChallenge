@@ -162,97 +162,103 @@ export default function Selection() {
           )}
         </div>
 
-        {!isFull && (
-          <div className="card">
-            <div style={{ padding: '16px 20px 0' }}>
-              <div className="form-group">
-                <label>Rechercher une personnalité (nom ou prénom)</label>
-                <input
-                  className="form-input"
-                  value={query}
-                  onChange={e => setQuery(e.target.value)}
-                  placeholder="Ex. Nathalie Baye"
-                  autoFocus
-                />
-              </div>
-              {addError && <div className="login-error" style={{ marginBottom: 12 }}>{addError}</div>}
+        <div className="card">
+          <div style={{ padding: '16px 20px 0' }}>
+            <div className="form-group">
+              <label>Rechercher une personnalité (nom ou prénom)</label>
+              <input
+                className="form-input"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Ex. Nathalie Baye"
+                autoFocus
+              />
             </div>
-
-            <div style={{ padding: '0 20px 20px' }}>
-              {searching && <div className="loading"><div className="spinner" /> Recherche...</div>}
-
-              {!searching && query.trim().length >= 2 && results.length === 0 && (
-                <div className="empty-state" style={{ padding: '24px 0' }}>
-                  {deathMatches.length > 0 ? (
-                    <div className="login-error">
-                      ⚠️ {deathMatches.map(d => `${d.prenom} ${d.nom}`).join(', ')} : déjà décédé(e),
-                      impossible de sélectionner cette personne.
-                    </div>
-                  ) : (
-                    <>
-                      <div className="empty-text" style={{ marginBottom: 12 }}>
-                        Aucun résultat pour « {query} ».
-                      </div>
-                      <button className="btn btn-secondary btn-sm" onClick={() => setShowCreate(true)}>
-                        + Créer cette personne
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {!searching && results.length > 0 && (
-                <div className="table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Nom</th>
-                        <th>Catégorie</th>
-                        <th>Nationalité</th>
-                        <th>Naissance</th>
-                        <th>Âge</th>
-                        <th style={{ width: 140 }}></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {results.map(r => {
-                        const alreadySelected = selectedIds.has(r.id)
-                        return (
-                          <tr key={r.id}>
-                            <td className="fw-600">{r.prenom} {r.nom}</td>
-                            <td><span className="badge badge-cat">{r.categorie || '—'}</span></td>
-                            <td className="text-muted text-sm">{r.nationalite || '—'}</td>
-                            <td className="text-muted text-sm">{formatDate(r.date_naissance)}</td>
-                            <td className="text-muted text-sm">{formatAge(r.date_naissance)}</td>
-                            <td>
-                              {r.deja_decede ? (
-                                <span className="badge badge-deceased">⚠️ Décédée</span>
-                              ) : (
-                                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                                  <button className="btn btn-ghost btn-sm" title="Modifier"
-                                    onClick={() => setEditTarget(r)}>✏️</button>
-                                  <button className="btn btn-ghost btn-sm" title="Signaler le décès"
-                                    onClick={() => setReportTarget(r)}>☠️</button>
-                                  {alreadySelected ? (
-                                    <span className="text-muted text-sm">Déjà dans la liste</span>
-                                  ) : (
-                                    <button className="btn btn-primary btn-sm" onClick={() => handleAdd(r.id)}>
-                                      + Ajouter
-                                    </button>
-                                  )}
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
+            {isFull && (
+              <p className="text-muted text-sm" style={{ margin: '0 0 12px' }}>
+                Votre liste est complète : vous pouvez toujours proposer une nouvelle personnalité
+                ou signaler un décès, mais l'ajout à votre sélection restera bloqué.
+              </p>
+            )}
+            {addError && <div className="login-error" style={{ marginBottom: 12 }}>{addError}</div>}
           </div>
-        )}
+
+          <div style={{ padding: '0 20px 20px' }}>
+            {searching && <div className="loading"><div className="spinner" /> Recherche...</div>}
+
+            {!searching && query.trim().length >= 2 && results.length === 0 && (
+              <div className="empty-state" style={{ padding: '24px 0' }}>
+                {deathMatches.length > 0 ? (
+                  <div className="login-error">
+                    ⚠️ {deathMatches.map(d => `${d.prenom} ${d.nom}`).join(', ')} : déjà décédé(e),
+                    impossible de sélectionner cette personne.
+                  </div>
+                ) : (
+                  <>
+                    <div className="empty-text" style={{ marginBottom: 12 }}>
+                      Aucun résultat pour « {query} ».
+                    </div>
+                    <button className="btn btn-secondary btn-sm" onClick={() => setShowCreate(true)}>
+                      + Créer cette personne
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
+            {!searching && results.length > 0 && (
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Nom</th>
+                      <th>Catégorie</th>
+                      <th>Nationalité</th>
+                      <th>Naissance</th>
+                      <th>Âge</th>
+                      <th style={{ width: 140 }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {results.map(r => {
+                      const alreadySelected = selectedIds.has(r.id)
+                      return (
+                        <tr key={r.id}>
+                          <td className="fw-600">{r.prenom} {r.nom}</td>
+                          <td><span className="badge badge-cat">{r.categorie || '—'}</span></td>
+                          <td className="text-muted text-sm">{r.nationalite || '—'}</td>
+                          <td className="text-muted text-sm">{formatDate(r.date_naissance)}</td>
+                          <td className="text-muted text-sm">{formatAge(r.date_naissance)}</td>
+                          <td>
+                            {r.deja_decede ? (
+                              <span className="badge badge-deceased">⚠️ Décédée</span>
+                            ) : (
+                              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                                <button className="btn btn-ghost btn-sm" title="Modifier"
+                                  onClick={() => setEditTarget(r)}>✏️</button>
+                                <button className="btn btn-ghost btn-sm" title="Signaler le décès"
+                                  onClick={() => setReportTarget(r)}>☠️</button>
+                                {alreadySelected ? (
+                                  <span className="text-muted text-sm">Déjà dans la liste</span>
+                                ) : isFull ? (
+                                  <span className="text-muted text-sm">Liste complète</span>
+                                ) : (
+                                  <button className="btn btn-primary btn-sm" onClick={() => handleAdd(r.id)}>
+                                    + Ajouter
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {showCreate && (
@@ -260,6 +266,7 @@ export default function Selection() {
           initialNom={queryNom}
           initialPrenom={queryPrenom}
           validationRequired={validationRequired}
+          isFull={isFull}
           onClose={() => setShowCreate(false)}
           onCreated={loadSelection}
         />
