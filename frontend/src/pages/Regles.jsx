@@ -11,6 +11,9 @@ export default function Regles() {
   const [resetting, setResetting] = useState(false)
   const [resetError, setResetError] = useState('')
   const [resetDone, setResetDone] = useState('')
+  const [computing, setComputing] = useState(false)
+  const [computeError, setComputeError] = useState('')
+  const [pointsAnnee, setPointsAnnee] = useState(null)
 
   useEffect(() => {
     api.get('/regles').then(({ data }) => setRegles(data)).finally(() => setLoading(false))
@@ -69,6 +72,19 @@ export default function Regles() {
       setResetError('Erreur lors de la réinitialisation')
     } finally {
       setResetting(false)
+    }
+  }
+
+  const handleComputePointsAnnee = async () => {
+    setComputing(true)
+    setComputeError('')
+    try {
+      const { data } = await api.get('/regles/points-annee')
+      setPointsAnnee(data)
+    } catch {
+      setComputeError('Erreur lors du calcul')
+    } finally {
+      setComputing(false)
     }
   }
 
@@ -159,6 +175,42 @@ export default function Regles() {
               </button>
             </div>
             {exportError && <div className="option-feedback login-error">{exportError}</div>}
+
+            <div className="option-row">
+              <div className="option-icon">🏆</div>
+              <div className="option-info">
+                <div className="option-title">Comptage des points de l'année</div>
+                <div className="option-desc">Calcule les points obtenus par chaque joueur pour les décès survenus depuis le 1er janvier</div>
+              </div>
+              <button className="btn btn-secondary" disabled={computing} onClick={handleComputePointsAnnee}>
+                {computing ? 'Calcul en cours...' : 'Calculer'}
+              </button>
+            </div>
+            {computeError && <div className="option-feedback login-error">{computeError}</div>}
+            {pointsAnnee && (
+              <div className="option-feedback">
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Utilisateur</th>
+                        <th>Décès (année en cours)</th>
+                        <th>Points</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pointsAnnee.map(r => (
+                        <tr key={r.id}>
+                          <td className="fw-600">{r.username}</td>
+                          <td className="text-muted text-sm">{r.deces_count}</td>
+                          <td className="fw-600">{r.total_points}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
             <div className="option-row danger">
               <div className="option-icon">⚠</div>

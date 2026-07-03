@@ -31,4 +31,18 @@ router.post('/reset-selections', authenticate, requireRole('admin'), async (req,
   res.json({ message: 'Sélections réinitialisées', count: rowCount })
 })
 
+router.get('/points-annee', authenticate, requireRole('admin'), async (req, res) => {
+  const { rows } = await db.query(`
+    SELECT u.id, u.username,
+           COALESCE(SUM(CASE WHEN p.date_deces >= date_trunc('year', CURRENT_DATE) THEN ps.points ELSE 0 END), 0)::int AS total_points,
+           COUNT(CASE WHEN p.date_deces >= date_trunc('year', CURRENT_DATE) THEN ps.points END)::int AS deces_count
+    FROM users u
+    LEFT JOIN "playerSelection" ps ON ps.user_id = u.id
+    LEFT JOIN "personnalite" p ON p.id = ps.person_id
+    GROUP BY u.id, u.username
+    ORDER BY total_points DESC, u.username
+  `)
+  res.json(rows)
+})
+
 module.exports = router
