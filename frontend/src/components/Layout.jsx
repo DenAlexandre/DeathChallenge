@@ -67,7 +67,7 @@ export default function Layout() {
                 to="/regles"
                 className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}
               >
-                <span>📜</span> Règles
+                <span>📜</span> Options système
               </NavLink>
             </>
           ) : (
