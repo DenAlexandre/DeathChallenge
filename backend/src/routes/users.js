@@ -2,6 +2,7 @@ const express = require('express')
 const bcrypt = require('bcryptjs')
 const db = require('../db')
 const { authenticate, requireRole } = require('../middleware/auth')
+const { computeLeaderboardTotals } = require('../services/pointsService')
 
 const router = express.Router()
 
@@ -13,16 +14,25 @@ router.get('/', authenticate, requireRole('admin'), async (req, res) => {
 })
 
 router.get('/leaderboard', authenticate, async (req, res) => {
-  const { rows } = await db.query(`
-    SELECT u.id, u.username,
-           COALESCE(SUM(ps.points), 0)::int AS total_points,
-           COUNT(ps.points) FILTER (WHERE ps.points IS NOT NULL)::int AS deces_count
-    FROM users u
-    LEFT JOIN "playerSelection" ps ON ps.user_id = u.id
-    GROUP BY u.id, u.username
-    ORDER BY total_points DESC, u.username
+  const { rows: users } = await db.query('SELECT id, username FROM users ORDER BY username')
+  const { rows: deaths } = await db.query(`
+    SELECT ps.user_id AS "userId", u.username, ps.points,
+           to_char(p.date_deces, 'YYYY-MM-DD') AS "dateKey"
+    FROM "playerSelection" ps
+    JOIN users u ON u.id = ps.user_id
+    JOIN "personnalite" p ON p.id = ps.person_id
+    WHERE ps.points IS NOT NULL
   `)
-  res.json(rows)
+  const totals = new Map(computeLeaderboardTotals(deaths).map(t => [t.id, t]))
+  const result = users
+    .map(u => ({
+      id: u.id,
+      username: u.username,
+      total_points: totals.get(u.id)?.total_points ?? 0,
+      deces_count: totals.get(u.id)?.deces_count ?? 0,
+    }))
+    .sort((a, b) => b.total_points - a.total_points || a.username.localeCompare(b.username))
+  res.json(result)
 })
 
 router.post('/', authenticate, requireRole('admin'), async (req, res) => {
