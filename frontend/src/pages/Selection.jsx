@@ -65,7 +65,9 @@ export default function Selection() {
   const toggleSort = () => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
   const displayedSelection = sortDir
     ? [...mySelection].sort((a, b) => {
-        const cmp = `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`)
+        // Trie sur le même ordre que le texte affiché ("Prénom Nom"), sinon
+        // le tri par nom de famille semble incorrect visuellement.
+        const cmp = `${a.prenom} ${a.nom}`.localeCompare(`${b.prenom} ${b.nom}`)
         return sortDir === 'asc' ? cmp : -cmp
       })
     : mySelection
