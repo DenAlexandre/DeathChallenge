@@ -273,6 +273,12 @@ async function seedRegles() {
       description: "Si 2 personnalités (ou plus) de la liste d'un joueur meurent le même jour, leurs points sont additionnés puis majorés du pourcentage ci-contre (arrondi à l'entier supérieur).",
       valeur: 50,
     },
+    {
+      code: 'bonus_unique',
+      nom: 'Bonus sélection unique',
+      description: "Si une personnalité n'a été sélectionnée que par un seul joueur (et aucun autre) au moment de son décès, ce joueur reçoit le nombre de points bonus ci-contre, en plus des points normaux.",
+      valeur: 10,
+    },
   ]
   for (const r of defaults) {
     await db.query(

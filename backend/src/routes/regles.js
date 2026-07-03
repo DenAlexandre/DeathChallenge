@@ -36,15 +36,20 @@ router.get('/points-annee', authenticate, requireRole('admin'), async (req, res)
   const { rows: users } = await db.query('SELECT id, username FROM users ORDER BY username')
   const { rows: deaths } = await db.query(`
     SELECT ps.user_id AS "userId", u.username, ps.points,
-           to_char(p.date_deces, 'YYYY-MM-DD') AS "dateKey"
+           to_char(p.date_deces, 'YYYY-MM-DD') AS "dateKey",
+           COUNT(*) OVER (PARTITION BY ps.person_id)::int AS "selectorCount"
     FROM "playerSelection" ps
     JOIN users u ON u.id = ps.user_id
     JOIN "personnalite" p ON p.id = ps.person_id
     WHERE ps.points IS NOT NULL AND p.date_deces >= date_trunc('year', CURRENT_DATE)
   `)
-  const bonusRegle = await getRegle('bonus_meme_jour')
-  const bonus = { active: bonusRegle?.active !== false, pourcentage: bonusRegle?.valeur ?? 50 }
-  const totals = new Map(computeLeaderboardTotals(deaths, bonus).map(t => [t.id, t]))
+  const [sameDayRegle, uniqueRegle] = await Promise.all([
+    getRegle('bonus_meme_jour'),
+    getRegle('bonus_unique'),
+  ])
+  const sameDayBonus = { active: sameDayRegle?.active !== false, pourcentage: sameDayRegle?.valeur ?? 50 }
+  const uniqueBonus = { active: uniqueRegle?.active !== false, montant: uniqueRegle?.valeur ?? 10 }
+  const totals = new Map(computeLeaderboardTotals(deaths, sameDayBonus, uniqueBonus).map(t => [t.id, t]))
   const result = users
     .map(u => ({
       id: u.id,
