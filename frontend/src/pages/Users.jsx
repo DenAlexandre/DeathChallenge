@@ -63,6 +63,7 @@ export default function Users() {
                     <th>Email</th>
                     <th>Rôle</th>
                     <th>Créé le</th>
+                    <th>Personnalités choisies</th>
                     <th style={{ width: 120 }}></th>
                   </tr>
                 </thead>
@@ -87,6 +88,7 @@ export default function Users() {
                       <td className="text-muted text-sm">
                         {new Date(u.created_at).toLocaleDateString('fr-FR')}
                       </td>
+                      <td className="fw-600">{u.selection_count}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 4 }}>
                           <button

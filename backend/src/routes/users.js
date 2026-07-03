@@ -7,9 +7,14 @@ const { computeLeaderboardTotals } = require('../services/pointsService')
 const router = express.Router()
 
 router.get('/', authenticate, requireRole('admin'), async (req, res) => {
-  const { rows } = await db.query(
-    'SELECT id, username, email, role, created_at FROM users ORDER BY created_at'
-  )
+  const { rows } = await db.query(`
+    SELECT u.id, u.username, u.email, u.role, u.created_at,
+           COUNT(ps.id)::int AS selection_count
+    FROM users u
+    LEFT JOIN "playerSelection" ps ON ps.user_id = u.id
+    GROUP BY u.id
+    ORDER BY u.created_at
+  `)
   res.json(rows)
 })
 
