@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import UserModal from '../components/UserModal'
+import UserSelectionsModal from '../components/UserSelectionsModal'
 
 const ROLE_LABELS = { admin: 'Administrateur', joueur: 'Joueur' }
 const ROLE_BADGES = { admin: 'badge-admin', joueur: 'badge-joueur' }
@@ -12,6 +13,7 @@ export default function Users() {
   const [users,        setUsers]        = useState([])
   const [loading,      setLoading]      = useState(true)
   const [modal,        setModal]        = useState(null)
+  const [selectionsOf, setSelectionsOf] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting,     setDeleting]     = useState(false)
 
@@ -61,7 +63,7 @@ export default function Users() {
                     <th>Email</th>
                     <th>Rôle</th>
                     <th>Créé le</th>
-                    <th style={{ width: 90 }}></th>
+                    <th style={{ width: 120 }}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -87,6 +89,11 @@ export default function Users() {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: 4 }}>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => setSelectionsOf(u)}
+                            title="Voir la sélection"
+                          >🏆</button>
                           <button
                             className="btn btn-ghost btn-sm"
                             onClick={() => setModal({ user: u })}
@@ -121,6 +128,13 @@ export default function Users() {
           user={modal.user}
           onClose={() => setModal(null)}
           onSaved={handleSaved}
+        />
+      )}
+
+      {selectionsOf && (
+        <UserSelectionsModal
+          user={selectionsOf}
+          onClose={() => setSelectionsOf(null)}
         />
       )}
 

@@ -35,6 +35,20 @@ router.get('/leaderboard', authenticate, async (req, res) => {
   res.json(result)
 })
 
+router.get('/:id/selections', authenticate, requireRole('admin'), async (req, res) => {
+  const { rows } = await db.query(
+    `SELECT s.id, s.points, p.id AS person_id, p.nom, p.prenom, p.categorie,
+            p.date_naissance, p.nationalite, p.statut,
+            (p.date_deces IS NOT NULL) AS deja_decede
+     FROM "playerSelection" s
+     JOIN "personnalite" p ON p.id = s.person_id
+     WHERE s.user_id = $1
+     ORDER BY p.nom, p.prenom`,
+    [req.params.id]
+  )
+  res.json(rows)
+})
+
 router.post('/', authenticate, requireRole('admin'), async (req, res) => {
   const { username, email, password, role } = req.body
   if (!username?.trim() || !password) {
