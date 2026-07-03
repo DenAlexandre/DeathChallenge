@@ -90,6 +90,9 @@ export default function Selection() {
             {mySelection.length}{selectionLimit !== null ? `/${selectionLimit}` : ''} personnalités choisies · {totalPoints} point{totalPoints > 1 ? 's' : ''}
           </div>
         </div>
+        <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+          + Ajouter une personnalité
+        </button>
       </div>
 
       <div className="page-body">
