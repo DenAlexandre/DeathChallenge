@@ -104,6 +104,9 @@ async function initDB() {
   await db.query(`
     ALTER TABLE "personnalite" ADD COLUMN IF NOT EXISTS deces_signale_par INTEGER REFERENCES users(id) ON DELETE SET NULL
   `)
+  // Exception par personnalité (pas une règle globale) : cette personne ne
+  // rapporte jamais de points à son décès, quels que soient les bonus actifs.
+  await db.query(`ALTER TABLE "personnalite" ADD COLUMN IF NOT EXISTS sans_points BOOLEAN NOT NULL DEFAULT false`)
 
   // Import de l'ancienne table deathPerson puis suppression (idempotent : ne
   // s'exécute que si elle existe encore).

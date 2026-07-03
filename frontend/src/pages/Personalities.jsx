@@ -65,7 +65,12 @@ function PersonTable({ title, subtitle, persons, showDeath, setEditTarget, setDe
             <tbody>
               {pageRows.map(p => (
                 <tr key={p.id}>
-                  <td className="fw-600">{p.prenom} {p.nom}</td>
+                  <td className="fw-600">
+                    {p.prenom} {p.nom}
+                    {p.sans_points && (
+                      <span className="text-muted text-sm" title="Ne rapporte jamais de points"> 🚫pts</span>
+                    )}
+                  </td>
                   <td><span className="badge badge-cat">{p.categorie || '—'}</span></td>
                   <td className="text-muted text-sm">{p.nationalite || '—'}</td>
                   <td className="text-muted text-sm">{formatDate(p.date_naissance)}</td>

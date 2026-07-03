@@ -17,6 +17,7 @@ export default function AdminPersonModal({ person, onClose, onSaved }) {
     nationalite: person?.nationalite || '',
     date_naissance: person?.date_naissance || '',
     date_deces: person?.date_deces || '',
+    sans_points: person?.sans_points || false,
   })
   const [error,  setError]  = useState('')
   const [saving, setSaving] = useState(false)
@@ -48,6 +49,7 @@ export default function AdminPersonModal({ person, onClose, onSaved }) {
         nationalite: form.nationalite,
         date_naissance: form.date_naissance || null,
         date_deces: form.date_deces || null,
+        sans_points: form.sans_points,
       }
       const { data } = isEdit
         ? await api.put(`/personnalites/${person.id}`, payload)
@@ -120,6 +122,11 @@ export default function AdminPersonModal({ person, onClose, onSaved }) {
                   onChange={e => set('date_deces', e.target.value)}
                   min="1900-01-01" max={today()} />
               </div>
+              <label className="form-check">
+                <input type="checkbox" checked={form.sans_points}
+                  onChange={e => set('sans_points', e.target.checked)} />
+                Ne rapporte jamais de points (à son décès)
+              </label>
             </div>
           </div>
 

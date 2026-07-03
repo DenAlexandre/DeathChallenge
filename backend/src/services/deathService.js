@@ -21,12 +21,14 @@ async function applyDeath(personId, dateDeces, pointsRuleActive) {
     `UPDATE "personnalite"
      SET date_deces = $1, date_deces_proposee = NULL, deces_signale_par = NULL
      WHERE id = $2
-     RETURNING date_naissance`,
+     RETURNING date_naissance, sans_points`,
     [dateDeces, personId]
   )
   if (!rows[0]) return false
 
-  if (pointsRuleActive) {
+  // Exception par personnalité : ne rapporte jamais de points, quels que
+  // soient la règle "points_calcul" ou les bonus actifs.
+  if (pointsRuleActive && !rows[0].sans_points) {
     const age = calculateAge(rows[0].date_naissance, dateDeces)
     const points = age === null ? MIN_POINTS : Math.max(MIN_POINTS, 100 - age)
     await db.query(`UPDATE "playerSelection" SET points = $1 WHERE person_id = $2`, [points, personId])

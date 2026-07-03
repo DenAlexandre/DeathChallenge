@@ -36,7 +36,7 @@ router.get('/', authenticate, async (req, res) => {
 
 router.get('/all', authenticate, requireRole('admin'), async (req, res) => {
   const { rows } = await db.query(
-    `SELECT p.id, p.nom, p.prenom, p.categorie, p.nationalite, p.date_naissance, p.date_deces, p.statut,
+    `SELECT p.id, p.nom, p.prenom, p.categorie, p.nationalite, p.date_naissance, p.date_deces, p.statut, p.sans_points,
             (SELECT COUNT(*)::int FROM "playerSelection" s WHERE s.person_id = p.id) AS selections
      FROM "personnalite" p ORDER BY p.nom, p.prenom`
   )
@@ -78,7 +78,7 @@ router.get('/pending-deaths', authenticate, requireRole('admin'), async (req, re
 // Création (par un joueur ou un admin) : vivante ou décédée selon la présence
 // de date_deces. Passe par la validation admin si la règle est active.
 router.post('/', authenticate, async (req, res) => {
-  const { nom, prenom, categorie, nationalite, date_naissance, date_deces } = req.body
+  const { nom, prenom, categorie, nationalite, date_naissance, date_deces, sans_points } = req.body
   if (!nom?.trim() || !prenom?.trim()) {
     return res.status(400).json({ error: 'Nom et prénom requis' })
   }
@@ -99,10 +99,10 @@ router.post('/', authenticate, async (req, res) => {
   }
 
   const { rows } = await db.query(
-    `INSERT INTO "personnalite" (nom, prenom, categorie, nationalite, date_naissance, date_deces, statut, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-     RETURNING id, nom, prenom, categorie, date_naissance, date_deces, nationalite, statut`,
-    [nom.trim(), prenom.trim(), categorie || null, nationalite || null, date_naissance || null, date_deces || null, statut, req.user.id]
+    `INSERT INTO "personnalite" (nom, prenom, categorie, nationalite, date_naissance, date_deces, statut, created_by, sans_points)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     RETURNING id, nom, prenom, categorie, date_naissance, date_deces, nationalite, statut, sans_points`,
+    [nom.trim(), prenom.trim(), categorie || null, nationalite || null, date_naissance || null, date_deces || null, statut, req.user.id, req.user.role === 'admin' ? !!sans_points : false]
   )
   res.status(201).json(rows[0])
 })
@@ -197,7 +197,7 @@ router.delete('/:id/death-report', authenticate, requireRole('admin'), async (re
 // une date_deces sur une personne vivante, le décès est appliqué avec la
 // logique de points habituelle.
 router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
-  const { nom, prenom, categorie, nationalite, date_naissance, date_deces } = req.body
+  const { nom, prenom, categorie, nationalite, date_naissance, date_deces, sans_points } = req.body
   if (!nom?.trim() || !prenom?.trim()) {
     return res.status(400).json({ error: 'Nom et prénom requis' })
   }
@@ -207,10 +207,10 @@ router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
   const wasAlive = beforeRows[0].date_deces === null
 
   const { rows } = await db.query(
-    `UPDATE "personnalite" SET nom = $1, prenom = $2, categorie = $3, nationalite = $4, date_naissance = $5, date_deces = $6
-     WHERE id = $7
-     RETURNING id, nom, prenom, categorie, nationalite, date_naissance, date_deces, statut`,
-    [nom.trim(), prenom.trim(), categorie || null, nationalite || null, date_naissance || null, date_deces || null, req.params.id]
+    `UPDATE "personnalite" SET nom = $1, prenom = $2, categorie = $3, nationalite = $4, date_naissance = $5, date_deces = $6, sans_points = $7
+     WHERE id = $8
+     RETURNING id, nom, prenom, categorie, nationalite, date_naissance, date_deces, statut, sans_points`,
+    [nom.trim(), prenom.trim(), categorie || null, nationalite || null, date_naissance || null, date_deces || null, !!sans_points, req.params.id]
   )
 
   if (wasAlive && date_deces) {

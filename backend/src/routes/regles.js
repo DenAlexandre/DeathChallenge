@@ -48,7 +48,7 @@ router.post('/points-annee', authenticate, requireRole('admin'), async (req, res
       SELECT p.id, p.date_naissance, p.date_deces
       FROM "personnalite" p
       JOIN "playerSelection" ps ON ps.person_id = p.id
-      WHERE p.date_deces IS NOT NULL
+      WHERE p.date_deces IS NOT NULL AND p.sans_points = false
       GROUP BY p.id
       HAVING COUNT(ps.id) FILTER (WHERE ps.points IS NULL) > 0
     `)
