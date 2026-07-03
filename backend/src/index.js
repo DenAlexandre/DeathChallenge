@@ -109,6 +109,13 @@ async function initDB() {
   await db.query(`
     DO $$ BEGIN
       IF to_regclass('"deathPerson"') IS NOT NULL THEN
+        -- Colonnes ajoutées après la création initiale de deathPerson sur les
+        -- bases anciennes (ex. Render/Neon jamais passées par ces étapes) :
+        -- requises par les requêtes de fusion ci-dessous.
+        ALTER TABLE "deathPerson" ADD COLUMN IF NOT EXISTS statut VARCHAR(20) DEFAULT 'validee';
+        ALTER TABLE "deathPerson" ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+        ALTER TABLE "deathPerson" ADD COLUMN IF NOT EXISTS alive_person_id INTEGER REFERENCES "personnalite"(id) ON DELETE SET NULL;
+
         -- Décès validés liés à une personne existante (signalements aboutis)
         UPDATE "personnalite" p SET date_deces = dp.date_deces
         FROM "deathPerson" dp
