@@ -13,8 +13,18 @@ types.setTypeParser(1082, val => val)
 // supplémentaire à gérer entre dev et prod.
 const isLocalDb = /localhost|127\.0\.0\.1/.test(process.env.DATABASE_URL || '')
 
+// pg-connection-string force `ssl: {}` (verification stricte) dès que l'URL
+// contient sslmode=..., ce qui écraserait l'option ssl explicite ci-dessous.
+// On retire ce paramètre pour que notre config ssl fasse foi.
+let connectionString = process.env.DATABASE_URL
+if (connectionString) {
+  const url = new URL(connectionString)
+  url.searchParams.delete('sslmode')
+  connectionString = url.toString()
+}
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString,
   ssl: isLocalDb ? false : { rejectUnauthorized: false },
 })
 
