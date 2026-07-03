@@ -6,10 +6,37 @@ export default function Regles() {
   const [loading, setLoading] = useState(true)
   const [busyId,  setBusyId]  = useState(null)
   const [valeurDrafts, setValeurDrafts] = useState({})
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState('')
+  const [resetting, setResetting] = useState(false)
+  const [resetError, setResetError] = useState('')
+  const [resetDone, setResetDone] = useState('')
 
   useEffect(() => {
     api.get('/regles').then(({ data }) => setRegles(data)).finally(() => setLoading(false))
   }, [])
+
+  const handleExport = async () => {
+    setExporting(true)
+    setExportError('')
+    try {
+      const res = await api.get('/export/sql', { responseType: 'blob' })
+      const match = (res.headers['content-disposition'] || '').match(/filename="?([^"]+)"?/)
+      const filename = match?.[1] || 'deathchallenge-export.sql'
+      const url = URL.createObjectURL(res.data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      setExportError("Erreur lors de l'export")
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const updateRegle = async (id, payload) => {
     setBusyId(id)
@@ -30,6 +57,21 @@ export default function Regles() {
     updateRegle(regle.id, { valeur })
   }
 
+  const handleResetSelections = async () => {
+    if (!window.confirm('Réinitialiser tous les comptes ? Cette action supprime les personnalités sélectionnées par tous les joueurs, pour tous les comptes. Cette action est irréversible.')) return
+    setResetting(true)
+    setResetError('')
+    setResetDone('')
+    try {
+      const { data } = await api.post('/regles/reset-selections')
+      setResetDone(`${data.count} sélection(s) supprimée(s).`)
+    } catch {
+      setResetError('Erreur lors de la réinitialisation')
+    } finally {
+      setResetting(false)
+    }
+  }
+
   return (
     <>
       <div className="page-header">
@@ -37,9 +79,13 @@ export default function Regles() {
           <div className="page-title">Règles du jeu</div>
           <div className="page-subtitle">Activez, désactivez ou ajustez les règles sans toucher au code</div>
         </div>
+        <button className="btn btn-secondary" disabled={exporting} onClick={handleExport}>
+          {exporting ? 'Export en cours...' : '⬇ Export SQL'}
+        </button>
       </div>
 
       <div className="page-body">
+        {exportError && <div className="login-error" style={{ marginBottom: 16 }}>{exportError}</div>}
         <div className="card">
           {loading ? (
             <div className="loading"><div className="spinner" /> Chargement...</div>
@@ -97,6 +143,18 @@ export default function Regles() {
               </table>
             </div>
           )}
+        </div>
+
+        <div className="card" style={{ marginTop: 24 }}>
+          <div className="fw-600" style={{ marginBottom: 4 }}>Options système</div>
+          <div className="text-muted text-sm" style={{ marginBottom: 12 }}>
+            Actions globales affectant tous les comptes joueurs
+          </div>
+          {resetError && <div className="login-error" style={{ marginBottom: 12 }}>{resetError}</div>}
+          {resetDone && <div className="text-sm" style={{ marginBottom: 12, color: 'var(--color-success, green)' }}>{resetDone}</div>}
+          <button className="btn btn-danger" disabled={resetting} onClick={handleResetSelections}>
+            {resetting ? 'Réinitialisation en cours...' : 'Réinitialiser tous les comptes (vider les sélections)'}
+          </button>
         </div>
       </div>
     </>

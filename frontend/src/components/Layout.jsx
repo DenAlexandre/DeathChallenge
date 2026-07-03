@@ -71,12 +71,20 @@ export default function Layout() {
               </NavLink>
             </>
           ) : (
-            <NavLink
-              to="/selection"
-              className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}
-            >
-              <span>🎯</span> Ma sélection
-            </NavLink>
+            <>
+              <NavLink
+                to="/selection"
+                className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}
+              >
+                <span>🎯</span> Ma sélection
+              </NavLink>
+              <NavLink
+                to="/classement"
+                className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}
+              >
+                <span>🏆</span> Classement
+              </NavLink>
+            </>
           )}
         </nav>
 

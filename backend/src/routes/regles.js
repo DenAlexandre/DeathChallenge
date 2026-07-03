@@ -26,4 +26,9 @@ router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
   res.json(rows[0])
 })
 
+router.post('/reset-selections', authenticate, requireRole('admin'), async (req, res) => {
+  const { rowCount } = await db.query('DELETE FROM "playerSelection"')
+  res.json({ message: 'Sélections réinitialisées', count: rowCount })
+})
+
 module.exports = router

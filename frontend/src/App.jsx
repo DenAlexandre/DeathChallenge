@@ -44,9 +44,7 @@ export default function App() {
             <Route path="validation" element={
               <ProtectedRoute requiredRole="admin"><PendingValidation /></ProtectedRoute>
             } />
-            <Route path="classement" element={
-              <ProtectedRoute requiredRole="admin"><Leaderboard /></ProtectedRoute>
-            } />
+            <Route path="classement" element={<Leaderboard />} />
             <Route path="regles" element={
               <ProtectedRoute requiredRole="admin"><Regles /></ProtectedRoute>
             } />

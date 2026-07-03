@@ -20,6 +20,7 @@ app.use('/api/personnalites', require('./routes/personnalites'))
 app.use('/api/selections',    require('./routes/selections'))
 app.use('/api/regles',        require('./routes/regles'))
 app.use('/api/person-edits',  require('./routes/personEdits'))
+app.use('/api/export',        require('./routes/export'))
 app.get('/api/health',        (req, res) => res.json({ status: 'ok' }))
 
 app.use((err, req, res, next) => {

@@ -12,7 +12,7 @@ router.get('/', authenticate, requireRole('admin'), async (req, res) => {
   res.json(rows)
 })
 
-router.get('/leaderboard', authenticate, requireRole('admin'), async (req, res) => {
+router.get('/leaderboard', authenticate, async (req, res) => {
   const { rows } = await db.query(`
     SELECT u.id, u.username,
            COALESCE(SUM(ps.points), 0)::int AS total_points,
