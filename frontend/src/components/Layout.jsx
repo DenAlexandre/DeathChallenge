@@ -64,7 +64,7 @@ export default function Layout() {
                 <span>🏆</span> Classement
               </NavLink>
               <NavLink
-                to="/regles"
+                to="/optionsysteme"
                 className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}
               >
                 <span>📜</span> Options système
