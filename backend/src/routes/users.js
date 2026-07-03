@@ -20,7 +20,7 @@ router.get('/', authenticate, requireRole('admin'), async (req, res) => {
 })
 
 router.get('/leaderboard', authenticate, async (req, res) => {
-  const { rows: users } = await db.query('SELECT id, username FROM users ORDER BY username')
+  const { rows: users } = await db.query("SELECT id, username FROM users WHERE role = 'joueur' ORDER BY username")
   const { rows: deaths } = await db.query(`
     SELECT ps.user_id AS "userId", u.username, ps.points,
            to_char(p.date_deces, 'YYYY-MM-DD') AS "dateKey",
@@ -28,7 +28,7 @@ router.get('/leaderboard', authenticate, async (req, res) => {
     FROM "playerSelection" ps
     JOIN users u ON u.id = ps.user_id
     JOIN "personnalite" p ON p.id = ps.person_id
-    WHERE ps.points IS NOT NULL
+    WHERE ps.points IS NOT NULL AND u.role = 'joueur'
   `)
   const [sameDayRegle, uniqueRegle] = await Promise.all([
     getRegle('bonus_meme_jour'),

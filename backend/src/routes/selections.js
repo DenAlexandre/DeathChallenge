@@ -3,6 +3,15 @@ const db = require('../db')
 const { authenticate } = require('../middleware/auth')
 const { getRegle } = require('../regles')
 
+async function checkNotFrozen(res) {
+  const regle = await getRegle('selections_gelees')
+  if (regle?.active) {
+    res.status(403).json({ error: 'Les ajouts et suppressions de personnalités sont actuellement gelés par un administrateur' })
+    return false
+  }
+  return true
+}
+
 const router = express.Router()
 
 router.get('/', authenticate, async (req, res) => {
@@ -20,6 +29,7 @@ router.get('/', authenticate, async (req, res) => {
 })
 
 router.post('/', authenticate, async (req, res) => {
+  if (!(await checkNotFrozen(res))) return
   const { personId } = req.body
   if (!personId) return res.status(400).json({ error: 'personId requis' })
 
@@ -56,6 +66,7 @@ router.post('/', authenticate, async (req, res) => {
 })
 
 router.delete('/:id', authenticate, async (req, res) => {
+  if (!(await checkNotFrozen(res))) return
   const { rows } = await db.query(
     'DELETE FROM "playerSelection" WHERE id = $1 AND user_id = $2 RETURNING id',
     [req.params.id, req.user.id]

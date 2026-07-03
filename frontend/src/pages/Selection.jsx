@@ -32,6 +32,7 @@ export default function Selection() {
   const limiteRegle = regles.find(r => r.code === 'limite_selection')
   const selectionLimit = limiteRegle && limiteRegle.active === false ? null : (limiteRegle?.valeur ?? 10)
   const validationRequired = regles.find(r => r.code === 'validation_admin')?.active !== false
+  const selectionsFrozen = regles.find(r => r.code === 'selections_gelees')?.active === true
 
   const runSearch = async () => {
     if (query.trim().length < 2) return
@@ -96,6 +97,12 @@ export default function Selection() {
       </div>
 
       <div className="page-body">
+        {selectionsFrozen && (
+          <div className="login-error" style={{ marginBottom: 20 }}>
+            🔒 Les ajouts et suppressions de personnalités sont actuellement gelés par un administrateur.
+          </div>
+        )}
+
         <div className="card" style={{ marginBottom: 20 }}>
           {loading ? (
             <div className="loading"><div className="spinner" /> Chargement...</div>
@@ -152,8 +159,8 @@ export default function Selection() {
                                 onClick={() => setReportTarget({ id: p.person_id, nom: p.nom, prenom: p.prenom })}>☠️</button>
                             </>
                           )}
-                          <button className="btn btn-ghost btn-sm" title="Retirer"
-                            style={{ color: '#dc2626' }}
+                          <button className="btn btn-ghost btn-sm" title={selectionsFrozen ? 'Ajouts/suppressions gelés' : 'Retirer'}
+                            style={{ color: '#dc2626' }} disabled={selectionsFrozen}
                             onClick={() => handleRemove(p.id)}>🗑️</button>
                         </div>
                       </td>
@@ -243,6 +250,8 @@ export default function Selection() {
                                   onClick={() => setReportTarget(r)}>☠️</button>
                                 {alreadySelected ? (
                                   <span className="text-muted text-sm">Déjà dans la liste</span>
+                                ) : selectionsFrozen ? (
+                                  <span className="text-muted text-sm">Sélections gelées</span>
                                 ) : isFull ? (
                                   <span className="text-muted text-sm">Liste complète</span>
                                 ) : (

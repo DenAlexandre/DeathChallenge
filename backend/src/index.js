@@ -279,12 +279,19 @@ async function seedRegles() {
       description: "Si une personnalité n'a été sélectionnée que par un seul joueur (et aucun autre) au moment de son décès, ce joueur reçoit le nombre de points bonus ci-contre, en plus des points normaux.",
       valeur: 10,
     },
+    {
+      code: 'selections_gelees',
+      nom: 'Geler les sélections des joueurs',
+      description: "Quand cette option est activée, aucun joueur ne peut plus ajouter ou retirer une personnalité de sa liste (l'administration reste toujours possible).",
+      valeur: null,
+      active: false,
+    },
   ]
   for (const r of defaults) {
     await db.query(
-      `INSERT INTO "regles" (code, nom, description, valeur) VALUES ($1, $2, $3, $4)
+      `INSERT INTO "regles" (code, nom, description, active, valeur) VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (code) DO UPDATE SET description = EXCLUDED.description`,
-      [r.code, r.nom, r.description, r.valeur]
+      [r.code, r.nom, r.description, r.active ?? true, r.valeur]
     )
   }
 }
