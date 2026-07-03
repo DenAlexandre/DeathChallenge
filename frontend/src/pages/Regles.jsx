@@ -79,13 +79,9 @@ export default function Regles() {
           <div className="page-title">Règles du jeu</div>
           <div className="page-subtitle">Activez, désactivez ou ajustez les règles sans toucher au code</div>
         </div>
-        <button className="btn btn-secondary" disabled={exporting} onClick={handleExport}>
-          {exporting ? 'Export en cours...' : '⬇ Export SQL'}
-        </button>
       </div>
 
       <div className="page-body">
-        {exportError && <div className="login-error" style={{ marginBottom: 16 }}>{exportError}</div>}
         <div className="card">
           {loading ? (
             <div className="loading"><div className="spinner" /> Chargement...</div>
@@ -150,11 +146,17 @@ export default function Regles() {
           <div className="text-muted text-sm" style={{ marginBottom: 12 }}>
             Actions globales affectant tous les comptes joueurs
           </div>
+          {exportError && <div className="login-error" style={{ marginBottom: 12 }}>{exportError}</div>}
           {resetError && <div className="login-error" style={{ marginBottom: 12 }}>{resetError}</div>}
           {resetDone && <div className="text-sm" style={{ marginBottom: 12, color: 'var(--color-success, green)' }}>{resetDone}</div>}
-          <button className="btn btn-danger" disabled={resetting} onClick={handleResetSelections}>
-            {resetting ? 'Réinitialisation en cours...' : 'Réinitialiser tous les comptes (vider les sélections)'}
-          </button>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <button className="btn btn-secondary" disabled={exporting} onClick={handleExport}>
+              {exporting ? 'Export en cours...' : '⬇ Export SQL'}
+            </button>
+            <button className="btn btn-danger" disabled={resetting} onClick={handleResetSelections}>
+              {resetting ? 'Réinitialisation en cours...' : 'Réinitialiser tous les comptes (vider les sélections)'}
+            </button>
+          </div>
         </div>
       </div>
     </>
