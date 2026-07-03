@@ -14,10 +14,23 @@ export default function Regles() {
   const [computing, setComputing] = useState(false)
   const [computeError, setComputeError] = useState('')
   const [computeDone, setComputeDone] = useState('')
+  const [guybetException, setGuybetException] = useState(null)
+  const [guybetBusy, setGuybetBusy] = useState(false)
 
   useEffect(() => {
     api.get('/regles').then(({ data }) => setRegles(data)).finally(() => setLoading(false))
+    api.get('/regles/exception-guybet').then(({ data }) => setGuybetException(data.active))
   }, [])
+
+  const handleToggleGuybet = async () => {
+    setGuybetBusy(true)
+    try {
+      const { data } = await api.put('/regles/exception-guybet', { active: !guybetException })
+      setGuybetException(data.active)
+    } finally {
+      setGuybetBusy(false)
+    }
+  }
 
   const handleExport = async () => {
     setExporting(true)
@@ -155,18 +168,26 @@ export default function Regles() {
                       </td>
                     </tr>
                   ))}
-                  <tr>
-                    <td>
-                      <div className="fw-600">Exception : Henri Guybet</div>
-                      <div className="text-muted text-sm">
-                        Cette personnalité ne rapporte jamais de points à son décès, quelles que soient les autres règles actives.
-                      </div>
-                    </td>
-                    <td></td>
-                    <td>
-                      <span className="badge badge-cat">Fixe</span>
-                    </td>
-                  </tr>
+                  {guybetException !== null && (
+                    <tr>
+                      <td>
+                        <div className="fw-600">Exception : Henri Guybet</div>
+                        <div className="text-muted text-sm">
+                          Cette personnalité ne rapporte jamais de points à son décès, quelles que soient les autres règles actives.
+                        </div>
+                      </td>
+                      <td></td>
+                      <td>
+                        <label className="form-check">
+                          <input type="checkbox" checked={guybetException} disabled={guybetBusy}
+                            onChange={handleToggleGuybet} />
+                          <span className={`badge ${guybetException ? 'badge-alive' : 'badge-deceased'}`}>
+                            {guybetException ? 'Activée' : 'Désactivée'}
+                          </span>
+                        </label>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

@@ -7,6 +7,7 @@ import Selection        from './pages/Selection'
 import PendingValidation from './pages/PendingValidation'
 import Leaderboard       from './pages/Leaderboard'
 import Regles            from './pages/Regles'
+import ReglesJoueur      from './pages/ReglesJoueur'
 import Personalities     from './pages/Personalities'
 
 function ProtectedRoute({ children, requiredRole }) {
@@ -45,6 +46,7 @@ export default function App() {
               <ProtectedRoute requiredRole="admin"><PendingValidation /></ProtectedRoute>
             } />
             <Route path="classement" element={<Leaderboard />} />
+            <Route path="regles" element={<ReglesJoueur />} />
             <Route path="optionsysteme" element={
               <ProtectedRoute requiredRole="admin"><Regles /></ProtectedRoute>
             } />

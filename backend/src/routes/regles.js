@@ -13,6 +13,28 @@ router.get('/', authenticate, async (req, res) => {
   res.json(rows)
 })
 
+// Exception ciblée (pas une règle globale en base "regles") : Henri Guybet ne
+// rapporte jamais de points à son décès. Recherché par nom plutôt que par id
+// pour rester valable quel que soit l'environnement (id différent sur Neon).
+// Déclarée avant PUT /:id (générique) pour ne pas s'y faire intercepter.
+router.get('/exception-guybet', authenticate, async (req, res) => {
+  const { rows } = await db.query(
+    `SELECT id, sans_points FROM "personnalite" WHERE lower(nom) = 'guybet' AND lower(prenom) = 'henri'`
+  )
+  res.json({ active: rows[0]?.sans_points ?? false })
+})
+
+router.put('/exception-guybet', authenticate, requireRole('admin'), async (req, res) => {
+  const { rows } = await db.query(
+    `UPDATE "personnalite" SET sans_points = $1
+     WHERE lower(nom) = 'guybet' AND lower(prenom) = 'henri'
+     RETURNING id, sans_points`,
+    [!!req.body.active]
+  )
+  if (!rows[0]) return res.status(404).json({ error: 'Henri Guybet introuvable en base' })
+  res.json({ active: rows[0].sans_points })
+})
+
 router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
   const active = req.body.active === undefined ? null : req.body.active
   const valeur = req.body.valeur === undefined ? null : req.body.valeur
