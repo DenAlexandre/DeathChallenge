@@ -16,7 +16,7 @@ if (-not $?) { Write-Host "Erreur docker-compose" -ForegroundColor Red; exit 1 }
 Write-Host "      Attente de PostgreSQL..." -ForegroundColor DarkGray
 $ready = $false
 for ($i = 0; $i -lt 15; $i++) {
-    $check = docker-compose exec -T postgres pg_isready -U dc_user -d deathchallenge 2>&1
+    $check = docker-compose exec -T postgres pg_isready -U dc_user -d deathchallenge
     if ($check -match "accepting connections") { $ready = $true; break }
     Start-Sleep -Seconds 1
 }
