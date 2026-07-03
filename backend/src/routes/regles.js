@@ -2,8 +2,10 @@ const express = require('express')
 const db = require('../db')
 const { authenticate, requireRole } = require('../middleware/auth')
 const { invalidateRegles, getRegle } = require('../regles')
+const { calculateAge } = require('../services/deathService')
 const { computeLeaderboardTotals } = require('../services/pointsService')
 
+const MIN_POINTS = 10
 const router = express.Router()
 
 router.get('/', authenticate, async (req, res) => {
@@ -32,7 +34,35 @@ router.post('/reset-selections', authenticate, requireRole('admin'), async (req,
   res.json({ message: 'Sélections réinitialisées', count: rowCount })
 })
 
-router.get('/points-annee', authenticate, requireRole('admin'), async (req, res) => {
+// Recalcule le classement de l'année en appliquant toutes les règles actives
+// (calcul des points, bonus même-jour, bonus sélection unique), et rattrape au
+// passage tout décès déjà acté dont les points n'auraient jamais été calculés
+// (ex. décès fixé hors du flux normal de l'app) — toutes années confondues,
+// pour ne pas laisser d'anomalie invisible en dehors du filtre de l'année.
+router.post('/points-annee', authenticate, requireRole('admin'), async (req, res) => {
+  const pointsRegle = await getRegle('points_calcul')
+  let corrections = 0
+
+  if (pointsRegle?.active !== false) {
+    const { rows: missing } = await db.query(`
+      SELECT p.id, p.date_naissance, p.date_deces
+      FROM "personnalite" p
+      JOIN "playerSelection" ps ON ps.person_id = p.id
+      WHERE p.date_deces IS NOT NULL
+      GROUP BY p.id
+      HAVING COUNT(ps.id) FILTER (WHERE ps.points IS NULL) > 0
+    `)
+    for (const person of missing) {
+      const age = calculateAge(person.date_naissance, person.date_deces)
+      const points = age === null ? MIN_POINTS : Math.max(MIN_POINTS, 100 - age)
+      const { rowCount } = await db.query(
+        `UPDATE "playerSelection" SET points = $1 WHERE person_id = $2 AND points IS NULL`,
+        [points, person.id]
+      )
+      corrections += rowCount
+    }
+  }
+
   const { rows: users } = await db.query("SELECT id, username FROM users WHERE role = 'joueur' ORDER BY username")
   const { rows: deaths } = await db.query(`
     SELECT ps.user_id AS "userId", u.username, ps.points,
@@ -50,7 +80,7 @@ router.get('/points-annee', authenticate, requireRole('admin'), async (req, res)
   const sameDayBonus = { active: sameDayRegle?.active !== false, pourcentage: sameDayRegle?.valeur ?? 50 }
   const uniqueBonus = { active: uniqueRegle?.active !== false, montant: uniqueRegle?.valeur ?? 10 }
   const totals = new Map(computeLeaderboardTotals(deaths, sameDayBonus, uniqueBonus).map(t => [t.id, t]))
-  const result = users
+  const leaderboard = users
     .map(u => ({
       id: u.id,
       username: u.username,
@@ -58,7 +88,7 @@ router.get('/points-annee', authenticate, requireRole('admin'), async (req, res)
       deces_count: totals.get(u.id)?.deces_count ?? 0,
     }))
     .sort((a, b) => b.total_points - a.total_points || a.username.localeCompare(b.username))
-  res.json(result)
+  res.json({ corrections, leaderboard })
 })
 
 module.exports = router

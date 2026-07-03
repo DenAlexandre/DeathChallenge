@@ -80,9 +80,11 @@ export default function Regles() {
     setComputeError('')
     setComputeDone('')
     try {
-      const { data } = await api.get('/regles/points-annee')
-      const total = data.reduce((sum, r) => sum + r.total_points, 0)
-      setComputeDone(`Calcul terminé : ${total} point(s) au total sur ${data.length} joueur(s).`)
+      const { data } = await api.post('/regles/points-annee')
+      const { corrections, leaderboard } = data
+      const total = leaderboard.reduce((sum, r) => sum + r.total_points, 0)
+      const correctionMsg = corrections > 0 ? ` (${corrections} anomalie(s) corrigée(s))` : ''
+      setComputeDone(`Calcul terminé : ${total} point(s) au total sur ${leaderboard.length} joueur(s)${correctionMsg}.`)
     } catch {
       setComputeError('Erreur lors du calcul')
     } finally {
@@ -182,7 +184,7 @@ export default function Regles() {
               <div className="option-icon">🏆</div>
               <div className="option-info">
                 <div className="option-title">Comptage des points de l'année</div>
-                <div className="option-desc">Calcule les points obtenus par chaque joueur pour les décès survenus depuis le 1er janvier</div>
+                <div className="option-desc">Vérifie et applique toutes les règles (points de base, bonus) sur tous les joueurs, corrige les anomalies, puis calcule les points de l'année depuis le 1er janvier</div>
               </div>
               <button className="btn btn-secondary" disabled={computing} onClick={handleComputePointsAnnee}>
                 {computing ? 'Calcul en cours...' : 'Calculer'}
