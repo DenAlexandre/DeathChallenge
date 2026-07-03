@@ -29,6 +29,9 @@ router.get('/', authenticate, async (req, res) => {
 })
 
 router.post('/', authenticate, async (req, res) => {
+  if (req.user.role === 'admin') {
+    return res.status(403).json({ error: 'Un administrateur ne peut pas sélectionner de personnalités' })
+  }
   if (!(await checkNotFrozen(res))) return
   const { personId } = req.body
   if (!personId) return res.status(400).json({ error: 'personId requis' })

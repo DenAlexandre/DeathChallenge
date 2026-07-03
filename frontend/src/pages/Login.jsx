@@ -3,11 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import PasswordInput from '../components/PasswordInput'
 
-const DEMO_USERS = [
-  { username: 'admin',  password: 'admin123',  label: 'Administrateur', badge: 'badge-admin'  },
-  { username: 'joueur', password: 'joueur123', label: 'Joueur',         badge: 'badge-joueur' },
-]
-
 export default function Login() {
   const [form,    setForm]    = useState({ username: '', password: '' })
   const [error,   setError]   = useState('')
@@ -69,20 +64,6 @@ export default function Login() {
             {loading ? 'Connexion...' : 'Se connecter'}
           </button>
         </form>
-
-        <div className="demo-creds-box">
-          <div className="demo-creds-title">Comptes de démonstration (cliquer pour remplir)</div>
-          {DEMO_USERS.map(u => (
-            <div key={u.username} className="demo-row"
-              onClick={() => setForm({ username: u.username, password: u.password })}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className={`badge ${u.badge}`}>{u.label}</span>
-                <span className="demo-mono"><strong>{u.username}</strong></span>
-              </div>
-              <span className="demo-mono">{u.password}</span>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   )

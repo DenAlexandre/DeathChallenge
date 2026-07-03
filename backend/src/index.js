@@ -234,7 +234,6 @@ async function seed() {
   // garde-fou global sauterait la création du compte manquant indéfiniment.
   const defaults = [
     { username: 'admin',  email: 'admin@local',  password: 'admin123',  role: 'admin'  },
-    { username: 'joueur', email: 'joueur@local', password: 'joueur123', role: 'joueur' },
   ]
   for (const u of defaults) {
     const hash = await bcrypt.hash(u.password, 10)

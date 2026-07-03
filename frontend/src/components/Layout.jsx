@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import ChangePasswordModal from './ChangePasswordModal'
 
 const ROLE_LABELS = { admin: 'Administrateur', joueur: 'Joueur' }
 
@@ -8,6 +9,7 @@ export default function Layout() {
   const { user, logout } = useAuth()
   const isAdmin = user?.role === 'admin'
   const [menuOpen, setMenuOpen] = useState(false)
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
   const location = useLocation()
 
   // Referme le tiroir mobile à chaque changement de page.
@@ -96,6 +98,9 @@ export default function Layout() {
               <div className={`user-role role-${user?.role}`}>{ROLE_LABELS[user?.role]}</div>
             </div>
           </div>
+          <button className="btn-logout" style={{ marginBottom: 8 }} onClick={() => setShowPasswordModal(true)}>
+            🔑 Mot de passe
+          </button>
           <button className="btn-logout" onClick={logout}>
             ← Déconnexion
           </button>
@@ -105,6 +110,10 @@ export default function Layout() {
       <main className="main-content">
         <Outlet />
       </main>
+
+      {showPasswordModal && (
+        <ChangePasswordModal onClose={() => setShowPasswordModal(false)} />
+      )}
     </div>
   )
 }

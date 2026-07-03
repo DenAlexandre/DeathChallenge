@@ -29,7 +29,7 @@ docker compose down     # Stop
 3. `cd backend && npm install && npm run dev`
 4. `cd frontend && npm install && npm run dev`
 
-The backend auto-creates tables (and applies schema migrations idempotently) on every start, and seeds 2 demo accounts: `admin/admin123`, `joueur/joueur123`.
+The backend auto-creates tables (and applies schema migrations idempotently) on every start, and seeds 1 demo account: `admin/admin123`.
 
 ## Architecture
 
