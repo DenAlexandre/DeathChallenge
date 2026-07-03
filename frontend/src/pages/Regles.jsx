@@ -155,6 +155,18 @@ export default function Regles() {
                       </td>
                     </tr>
                   ))}
+                  <tr>
+                    <td>
+                      <div className="fw-600">Exception : Henri Guybet</div>
+                      <div className="text-muted text-sm">
+                        Cette personnalité ne rapporte jamais de points à son décès, quelles que soient les autres règles actives.
+                      </div>
+                    </td>
+                    <td></td>
+                    <td>
+                      <span className="badge badge-cat">Fixe</span>
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
