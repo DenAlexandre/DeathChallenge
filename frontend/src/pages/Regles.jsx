@@ -13,7 +13,7 @@ export default function Regles() {
   const [resetDone, setResetDone] = useState('')
   const [computing, setComputing] = useState(false)
   const [computeError, setComputeError] = useState('')
-  const [pointsAnnee, setPointsAnnee] = useState(null)
+  const [computeDone, setComputeDone] = useState('')
 
   useEffect(() => {
     api.get('/regles').then(({ data }) => setRegles(data)).finally(() => setLoading(false))
@@ -78,9 +78,11 @@ export default function Regles() {
   const handleComputePointsAnnee = async () => {
     setComputing(true)
     setComputeError('')
+    setComputeDone('')
     try {
       const { data } = await api.get('/regles/points-annee')
-      setPointsAnnee(data)
+      const total = data.reduce((sum, r) => sum + r.total_points, 0)
+      setComputeDone(`Calcul terminé : ${total} point(s) au total sur ${data.length} joueur(s).`)
     } catch {
       setComputeError('Erreur lors du calcul')
     } finally {
@@ -187,30 +189,7 @@ export default function Regles() {
               </button>
             </div>
             {computeError && <div className="option-feedback login-error">{computeError}</div>}
-            {pointsAnnee && (
-              <div className="option-feedback">
-                <div className="table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Utilisateur</th>
-                        <th>Décès (année en cours)</th>
-                        <th>Points</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pointsAnnee.map(r => (
-                        <tr key={r.id}>
-                          <td className="fw-600">{r.username}</td>
-                          <td className="text-muted text-sm">{r.deces_count}</td>
-                          <td className="fw-600">{r.total_points}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+            {computeDone && <div className="option-feedback text-sm" style={{ color: 'var(--success)' }}>{computeDone}</div>}
 
             <div className="option-row danger">
               <div className="option-icon">⚠</div>
