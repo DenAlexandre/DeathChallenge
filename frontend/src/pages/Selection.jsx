@@ -3,7 +3,26 @@ import api from '../api/client'
 import CreatePersonModal from '../components/CreatePersonModal'
 import ReportDeathModal from '../components/ReportDeathModal'
 import EditPersonModal from '../components/EditPersonModal'
-import { formatDate, formatAge } from '../lib/format'
+import { formatDate, formatAge, calculateAge } from '../lib/format'
+
+const SORT_COLUMNS = {
+  nom: { label: 'Nom', getValue: p => `${p.prenom} ${p.nom}` },
+  categorie: { label: 'Catégorie', getValue: p => p.categorie },
+  nationalite: { label: 'Nationalité', getValue: p => p.nationalite },
+  naissance: { label: 'Naissance', getValue: p => p.date_naissance },
+  age: { label: 'Âge', getValue: p => calculateAge(p.date_naissance) },
+  statut: { label: 'Statut', getValue: p => (p.deja_decede ? 2 : p.statut === 'en_attente' ? 0 : 1) },
+}
+
+function compareValues(va, vb) {
+  const aEmpty = va === null || va === undefined || va === ''
+  const bEmpty = vb === null || vb === undefined || vb === ''
+  if (aEmpty && bEmpty) return 0
+  if (aEmpty) return 1
+  if (bEmpty) return -1
+  if (typeof va === 'number' && typeof vb === 'number') return va - vb
+  return String(va).localeCompare(String(vb))
+}
 
 export default function Selection() {
   const [mySelection, setMySelection] = useState([])
@@ -17,6 +36,7 @@ export default function Selection() {
   const [reportTarget, setReportTarget] = useState(null)
   const [editTarget,   setEditTarget]   = useState(null)
   const [regles,       setRegles]       = useState([])
+  const [sortKey,      setSortKey]      = useState(null)
   const [sortDir,      setSortDir]      = useState(null)
   const debounceRef = useRef(null)
 
@@ -62,12 +82,14 @@ export default function Selection() {
   const isFull = selectionLimit !== null && mySelection.length >= selectionLimit
   const selectedIds = new Set(mySelection.map(s => s.person_id))
 
-  const toggleSort = () => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
-  const displayedSelection = sortDir
+  const toggleSort = (key) => {
+    if (sortKey !== key) { setSortKey(key); setSortDir('asc') }
+    else setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
+  }
+  const displayedSelection = sortKey
     ? [...mySelection].sort((a, b) => {
-        // Trie sur le même ordre que le texte affiché ("Prénom Nom"), sinon
-        // le tri par nom de famille semble incorrect visuellement.
-        const cmp = `${a.prenom} ${a.nom}`.localeCompare(`${b.prenom} ${b.nom}`)
+        const { getValue } = SORT_COLUMNS[sortKey]
+        const cmp = compareValues(getValue(a), getValue(b))
         return sortDir === 'asc' ? cmp : -cmp
       })
     : mySelection
@@ -127,14 +149,11 @@ export default function Selection() {
               <table>
                 <thead>
                   <tr>
-                    <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={toggleSort}>
-                      Nom {sortDir === 'asc' ? '▲' : sortDir === 'desc' ? '▼' : ''}
-                    </th>
-                    <th>Catégorie</th>
-                    <th>Nationalité</th>
-                    <th>Naissance</th>
-                    <th>Âge</th>
-                    <th>Statut</th>
+                    {Object.entries(SORT_COLUMNS).map(([key, { label }]) => (
+                      <th key={key} style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort(key)}>
+                        {label} {sortKey === key ? (sortDir === 'asc' ? '▲' : '▼') : ''}
+                      </th>
+                    ))}
                     <th style={{ width: 50 }}></th>
                   </tr>
                 </thead>
