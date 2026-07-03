@@ -1,7 +1,7 @@
 const express = require('express')
 const db = require('../db')
 const { authenticate, requireRole } = require('../middleware/auth')
-const { invalidateRegles } = require('../regles')
+const { invalidateRegles, getRegle } = require('../regles')
 const { computeLeaderboardTotals } = require('../services/pointsService')
 
 const router = express.Router()
@@ -42,7 +42,9 @@ router.get('/points-annee', authenticate, requireRole('admin'), async (req, res)
     JOIN "personnalite" p ON p.id = ps.person_id
     WHERE ps.points IS NOT NULL AND p.date_deces >= date_trunc('year', CURRENT_DATE)
   `)
-  const totals = new Map(computeLeaderboardTotals(deaths).map(t => [t.id, t]))
+  const bonusRegle = await getRegle('bonus_meme_jour')
+  const bonus = { active: bonusRegle?.active !== false, pourcentage: bonusRegle?.valeur ?? 50 }
+  const totals = new Map(computeLeaderboardTotals(deaths, bonus).map(t => [t.id, t]))
   const result = users
     .map(u => ({
       id: u.id,

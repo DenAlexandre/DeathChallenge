@@ -252,7 +252,7 @@ async function seedRegles() {
     {
       code: 'points_calcul',
       nom: 'Calcul des points au décès',
-      description: "Attribue (100 - âge au décès, minimum 10) points à chaque joueur ayant sélectionné la personne, lors de la validation du décès. Si 2 personnalités de la liste d'un joueur meurent le même jour, leurs points sont additionnés puis majorés de 50 % (arrondi à l'entier supérieur).",
+      description: "Attribue (100 - âge au décès, minimum 10) points à chaque joueur ayant sélectionné la personne, lors de la validation du décès.",
       valeur: null,
     },
     {
@@ -266,6 +266,12 @@ async function seedRegles() {
       nom: 'Limite de sélection',
       description: "Nombre maximum de personnalités qu'un joueur peut sélectionner simultanément.",
       valeur: 10,
+    },
+    {
+      code: 'bonus_meme_jour',
+      nom: 'Bonus décès le même jour',
+      description: "Si 2 personnalités (ou plus) de la liste d'un joueur meurent le même jour, leurs points sont additionnés puis majorés du pourcentage ci-contre (arrondi à l'entier supérieur).",
+      valeur: 50,
     },
   ]
   for (const r of defaults) {
