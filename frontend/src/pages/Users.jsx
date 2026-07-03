@@ -22,8 +22,8 @@ export default function Users() {
   }, [])
 
   const handleSaved = (saved, mode) => {
-    if (mode === 'add') setUsers(u => [...u, saved])
-    else setUsers(u => u.map(x => x.id === saved.id ? saved : x))
+    if (mode === 'add') setUsers(u => [...u, { ...saved, selection_count: 0 }])
+    else setUsers(u => u.map(x => x.id === saved.id ? { ...x, ...saved } : x))
   }
 
   const handleDelete = async () => {
